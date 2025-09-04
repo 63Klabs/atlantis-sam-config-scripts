@@ -404,8 +404,8 @@ class StackDestroyer:
 
                         # Generate a random 5 character code
                         code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
-                        # replace 0 and O with X and Z
-                        code = code.replace('0', 'X').replace('O', 'Z')
+                        # replace 0 and O with Z and X
+                        code = code.replace('0', 'Z').replace('O', 'X')
                         # display code to user with spaces so they don't copy/paste
                         display_code = ' '.join(code)
                         entered_code = Colorize.prompt(f"Type the code '{display_code}' (without spaces) to confirm deletion", "", str)
