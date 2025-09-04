@@ -390,7 +390,7 @@ class StackDestroyer:
 
                 # confirm deletion of resources
                 print()
-                if not click.confirm(Colorize.question("Proceed with deletion of these resources?")):
+                if not click.confirm(Colorize.question("Proceed with deletion of some or all of these resources? (you will confirm/skip each one)")):
                     click.echo(Colorize.error("Resource deletion cancelled by user"))
                     Log.info("Resource deletion cancelled by user")
                     self.skipped_resources += resources_to_delete
@@ -435,7 +435,7 @@ class StackDestroyer:
                                     s3_client.delete_bucket(Bucket=bucket_name)
                                     click.echo(Colorize.success(f"Deleted S3 bucket: {bucket_name}"))
                                     Log.info(f"Deleted S3 bucket: {bucket_name}")
-                                elif ":dynamodb:table/" in res:
+                                elif ":dynamodb:" in res:
                                     dynamodb_client = self.aws_session.get_client('dynamodb', self.region)
                                     table_name = res.split("/")[-1]
                                     dynamodb_client.delete_table(TableName=table_name)

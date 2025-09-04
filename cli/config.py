@@ -1668,13 +1668,10 @@ class ConfigManager:
                 header_pystr += f" --profile {self.profile}"
 
             delete_msg = (
-                '# 1. FIRST delete the application stack using the command below:\n'
-                '#    sam delete --stack-name APPLICATION_STACK_NAME --profile [PROFILE]\n'
-                '# 2. THEN delete the pipeline stack using the command below:\n'
-                '#    sam delete --stack-name PIPELINE_STACK_NAME --profile [PROFILE]\n'
-                '#  -- FAILURE TO DELETE IN THIS ORDER WILL RESULT IN MISSING IAM PERMISSIONS! --\n\n'               
+                '# -- FAILURE TO DELETE PROPERLY MAY RESULT IN MISSING/UNMANAGED RESOURCES! --\n'
+                '# Set DeleteOnOrBefore tag and disable stack termination protection prior to deletion.\n\n'              
             ) if self.infra_type == 'pipeline' else (
-                f'# sam delete --stack-name STACK_NAME --profile [PROFILE]\n\n'
+                f'# Delete the stack using the python script:\n# ./cli/delete.py <INFRA_TYPE> <PREFIX> <PROJECT_ID> <STAGE_ID> --profile [PROFILE]\n\n'
             )
             # Create the header with version and comments
             header = (
