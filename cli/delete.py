@@ -404,6 +404,8 @@ class StackDestroyer:
 
                         # Generate a random 5 character code
                         code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
+                        # replace 0 and O with X and Z
+                        code = code.replace('0', 'X').replace('O', 'Z')
                         # display code to user with spaces so they don't copy/paste
                         display_code = ' '.join(code)
                         entered_code = Colorize.prompt(f"Type the code '{display_code}' (without spaces) to confirm deletion", "", str)
@@ -456,6 +458,7 @@ class StackDestroyer:
                                 else:
                                     click.echo(Colorize.warning(f"Unsupported resource type for deletion: {res}"))
                                     Log.warning(f"Unsupported resource type for deletion: {res}")
+                                    self.skipped_resources.append(res)
 
                             except KeyboardInterrupt:
                                 click.echo(Colorize.error("\nOperation cancelled by user"))
@@ -464,6 +467,7 @@ class StackDestroyer:
                             except Exception as e:
                                 click.echo(Colorize.error(f"Error deleting resource {res}: {str(e)}"))
                                 Log.error(f"Error deleting resource {res}: {str(e)}")
+                                self.skipped_resources.append(res)
 
                         else:
                             click.echo(Colorize.error("Confirmation code mismatch. Skipping deletion."))
