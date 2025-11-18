@@ -218,10 +218,10 @@ Developers will need an ARN of the service role to use for deploying application
 Be sure to replace `acme` with your Prefix and `ADMIN_PROFILE` with a profile that has permissions to create service roles.
 
 ```bash
-./cli/configure.py service-role acme pipeline --profile ADMIN_PROFILE
+./cli/config.py service-role acme pipeline --profile ADMIN_PROFILE
 ```
 
-After configuring the role, deploy using the `deploy.py` script.
+After configuring the role, deploy using the `deploy.py` script (or choose Deploy Now at the end of the config.py script).
 
 ```bash
 ./cli/deploy.py service-role acme pipeline --profile ADMIN_PROFILE
@@ -230,6 +230,28 @@ After configuring the role, deploy using the `deploy.py` script.
 Get the ARN of the service role from the output and add to the `*-defaults.json` file for the prefix.
 
 For example, for the prefix `acme`, update `defaults/acme-defaults.json` and set `atlantis.PipelineServiceRoleArn`.
+
+Be sure to commit your changes to the SAM config repository for others to use.
+
+## 5. Create Storage Service Role
+
+Developers will need an ARN of the service role to use for deploying storage stacks from the script CLI.
+
+Be sure to replace `acme` with your Prefix and `ADMIN_PROFILE` with a profile that has permissions to create service roles.
+
+```bash
+./cli/config.py service-role acme storage --profile ADMIN_PROFILE
+```
+
+After configuring the role, deploy using the `deploy.py` script (or choose Deploy Now at the end of the config.py script).
+
+```bash
+./cli/deploy.py service-role acme storage --profile ADMIN_PROFILE
+```
+
+Get the ARN of the service role from the output and add to the `*-defaults.json` file for the prefix.
+
+For example, for the prefix `acme`, update `defaults/acme-defaults.json` and set `atlantis.StorageServiceRoleArn`.
 
 Be sure to commit your changes to the SAM config repository for others to use.
 
