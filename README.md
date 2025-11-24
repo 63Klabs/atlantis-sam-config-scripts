@@ -1,37 +1,81 @@
 # Atlantis Configuration Repository for Serverless Deployments using AWS SAM
 
-A central repository structure and CLI to store, manage, and deploy supporting SAM configuration files for serverless infrastructure (such as pipelines). Various CLI allow for importing existing stack configurations, creating and seeding application repositories, managing tags, and updating multi-stage deployments all while using standard `samconfig` files.
+Atlantis provides a central repository structure and CLI to store, manage, and deploy supporting SAM configuration files for serverless infrastructure (such as pipelines, application storage, and CDN) across one or multiple AWS Accounts.
 
-While applications should be deployed using automated pipelines, those pipelines need to be created and managed. In addition to pipelines, applications may also have persistent S3, DynamoDb, Route53, and CloudFront resources outside of the main application stack.
+Various scripts allow for easily importing existing stack configurations (`import.py`), creating and seeding application repositories (`create_repo.py`), and creating (`config.py`) and deploying (`deploy.py`) pipelines and other stacks to support your application.
 
-SAM configuration files (`samconfig`) can handle stack configurations but cannot scale to handle tags and parameter overrides among multiple deployment stages. SAM config files also do not support utilizing templates stored in S3.
+The scripts also assist in managing tags and updating multi-stage deployments all while using standard CloudFormation templates and `samconfig` files. There is no proprietary format or "lock-in" as the scripts just automate and execute standard AWS CLI and AWS SAM CLI commands.
 
-These CLI and templates overcome those limitations and establish a structured approach to managing deployments.
+Anyone who has tried to go beyond the development stage using `samconfig` files have come across a few lacking features which Atlantis solves:
 
-## Prerequisites
+1. Atlantis allows you to store and use common templates for stacks such as CodePipeline in S3. Whereas `samconfig` does not natively support referencing templates stored in S3.
+2. Atlantis provides a structured way to manage multiple stages (dev, test, prod). Whereas `samconfig` requires all parameters to be copied to each stage environment.
+3. Atlantis helps manage stack parameter and tags. Whereas `samconfig` requires you to carefully edit long strings of `"\"Prefix\"=\"acme\" \"ProjectId\"=\"checkers\" \"StageId\"=\"test\" \"S3BucketNameOrgPrefix\"=\"finops\" \"RolePath\"=\"/app-role/\""`
+   which is error-prone and difficult to maintain.
+4. Atlantis provides default answers and tagging policies used across your organization and projects. Whereas `samconfig` requires manual practices. 
+
+These scripts and templates overcome those limitations and establish a structured approach to managing deployments.
+
+## Basic Usage
+
+You, your team, or organization maintains a central SAM Config repository where ALL your `samconfig` files reside. Developers have access to this repository to create and maintain the infrastructure that supports their application. This separates the occasional infrastructure update (storage, deployment pipeline, DNS/CDN) from rapid application development in the developer's application repository.
+
+A developer begins a project by either creating a repository manually or using the `create_repo.py` script to create, tag, and seed the repository with starter code:
+
+```bash
+# Works with GitHub or CodeCommit repositories. Use -h to see full list of options`
+./cli/create_repo.py your-repo-name 
+```
+
+Next, the developer configures and deploys a pipeline to automate deployments to a test environment:
+
+```bash
+# This will walk the developer through setting parameters and tags.
+./cli/config.py pipeline acme your-webapp test 
+```
+
+Finally, the developer deploys the pipeline infrastructure:
+
+```bash
+# This command could be skipped if 
+./cli/deploy.py pipeline acme your-webapp test
+```
+
+These commands assist in establishing good habits such as prompting the developer to pull changes from the repository before proceeding, pushing changes back to the repository, and walking the developer through configuring their stack with the proper parameters and tags.
+
+## Developer Prerequisites
 
 1. AWS CLI installed
 2. AWS SAM CLI installed
 3. Git installed
 4. Configured AWS profile with valid credentials
 5. GitHub CLI installed if you are using GitHub as your repo provider
+6. A SAM Config repository set-up by your organization
+
+See [instructions on setting up your local environment](./docs/00-Set-Up-Local-Environment.md) to ensure you are ready to go.
 
 These instructions assume you have an AWS account, AWS CLI, SAM, and profile configuration set up. They also assume a Linux-like environment and CLI. On Windows you can use Git Bash or Windows Subsystem for Linux (WSL). And finally, you should have a familiarity with AWS CLI, SAM, and git.
 
-## Install and Set Up
+It also assumes an account administrator has already [set up a copy of this repo](./docs/01-Set-Up-AWS-Account-and-Config-Repo.md) in your AWS account.
 
-> **If you are the AWS account administrator** (either personal or organization): Perform the following first: [Set Up AWS Account and Config Repo](./docs/01-Set-Up-AWS-Account-and-Config-Repo.md).
+## Developer Install and Set Up
 
-**If you are a developer:** Your organization should already have the configuration repository established. Obtain necessary information about the repository location, prefix, CloudFormation deploy bucket, and other requirements from your administrator. If you do not yet have an AWS development environment set up, see [Set-Up-Local-Environment](./docs/00-Set-Up-Local-Environment.md).
+The SAM Config repository for use with the Atlantis Platform should already be set up in your organization. Look for a repository with a `sam_config` or similar name.
 
-1. Clone this repository from your organization's version control system
-2. Make CLI Python scripts executable
-
-```bash
-chmod +x ./cli/*.py
-```
+1. Clone your organizations SAM Config repository
+2. Install and execute the scripts [Instructions here](./docs/00-Set-Up-Local-Environment.md#set-up-python)
 
 You're all set!
+
+From now on you can run:
+
+```bash
+# Start Python virtual env if that is the method you chose to run Python
+source .ve/bin/activate # Activate the Python virtual environment
+
+# Any Atlantis Platform script
+./cli/<scriptname>.py
+```
 
 ## Basic Usage Examples
 
@@ -49,7 +93,7 @@ You're all set!
 # Create a GitHub repository and choose from a list of application starters
 ./cli/create_repo.py your-repo-name --provider github
 
-# Create a GitHub repository and seed it with an application starter from a GitHub repository (requires GitHub CLI)
+# Create a GitHub repository and seed it with code from another GitHub repository (requires GitHub CLI)
 ./cli/create_repo.py your-repo-name --source https://github.com/someacct/some-repository --provider github
 
 # Create/Manage a pipeline infrastructure stack for your application's test branch
