@@ -275,7 +275,7 @@ Finally, the delete script has several steps where it prompts for confirmation, 
 
 ## Account Admins
 
-If you are an account admin needing to set-up and maintain this repository for your organization, see [Account Admin Documentation](./docs/01-Set-Up-AWS-Account-and-Config-Repo.md).
+If you are an account admin needing to set-up and maintain this repository for your organization, see [Account Admin Documentation](./docs/admin/00-Set-Up-AWS-Account-and-Config-Repo.md).
 
 ## License
 
