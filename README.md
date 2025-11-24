@@ -56,7 +56,7 @@ See [instructions on setting up your local environment](./docs/00-Set-Up-Local-E
 
 These instructions assume you have an AWS account, AWS CLI, SAM, and profile configuration set up. They also assume a Linux-like environment and CLI. On Windows you can use Git Bash or Windows Subsystem for Linux (WSL). And finally, you should have a familiarity with AWS CLI, SAM, and git.
 
-It also assumes an account administrator has already [set up a copy of this repo](./docs/01-Set-Up-AWS-Account-and-Config-Repo.md) in your AWS account.
+It also assumes an account administrator has already set up a copy of this repo in your organization's AWS account. [Info for Account Admins](./docs/01-Set-Up-AWS-Account-and-Config-Repo.md)
 
 ## Developer Install and Set Up
 
@@ -259,7 +259,7 @@ For additional update settings, run the following command:
 ./cli/update.py -h
 ```
 
-## Delete
+### Delete
 
 Permissions can be modified to restrict who can delete pipeline stacks and their associated application deployments.
 
@@ -272,3 +272,13 @@ Finally, the delete script has several steps where it prompts for confirmation, 
 ```bash
 ./cli/delete.py -h
 ```
+
+## Account Admins
+
+If you are an account admin setting-up this repository for your organization, see [Set Up AWS Account and COnfig Repo](./docs/01-Set-Up-AWS-Account-and-Config-Repo.md)
+
+## Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
+
+- [Chad Kluck](https://chadkluck.me)
