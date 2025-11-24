@@ -56,7 +56,7 @@ See [instructions on setting up your local environment](./docs/00-Set-Up-Local-E
 
 These instructions assume you have an AWS account, AWS CLI, SAM, and profile configuration set up. They also assume a Linux-like environment and CLI. On Windows you can use Git Bash or Windows Subsystem for Linux (WSL). And finally, you should have a familiarity with AWS CLI, SAM, and git.
 
-It also assumes an account administrator has already set up a copy of this repo in your organization's AWS account. [Info for Account Admins](./docs/01-Set-Up-AWS-Account-and-Config-Repo.md)
+It also assumes an [account administrator](#account-admins) has already set up a copy of this repo in your organization's AWS account.
 
 ## Developer Install and Set Up
 
@@ -275,7 +275,15 @@ Finally, the delete script has several steps where it prompts for confirmation, 
 
 ## Account Admins
 
-If you are an account admin setting-up this repository for your organization, see [Set Up AWS Account and COnfig Repo](./docs/01-Set-Up-AWS-Account-and-Config-Repo.md)
+If you are an account admin needing to set-up and maintain this repository for your organization, see [Account Admin Documentation](./docs/01-Set-Up-AWS-Account-and-Config-Repo.md).
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Security
+
+If you discover any security related issues, please see the [SECURITY](SECURITY) file for details.
 
 ## Contributing
 
