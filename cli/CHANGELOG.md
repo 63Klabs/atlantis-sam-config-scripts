@@ -7,18 +7,22 @@ To update your local cli scripts from GitHub repository:
 ```
 
 - The scripts are still in BETA and features are still being added and tested.
-- There may be several versions with small fixes released every few days until reaching v0.1.0.
+- There may be several versions with small fixes released every so often until reaching v0.1.0.
 - After v0.1.0 all v0.0.x version change information will be removed from the Changelog.
-- Refer to [TODO](../TODO.md) for upcoming BETA fixes and features.
+- Refer to [TODO](./TODO.md) for upcoming BETA fixes and features.
 - Report any issues not covered in TODO via the [Issues page in the GitHub repository](https://github.com/63Klabs/atlantis-cfn-configuration-repo-for-serverless-deployments/issues)
 
-## v0.0.11 (2025-08-27)
+## v0.0.15 - unreleased
+
+- **config.py v0.1.7/2026-03-26**: Fixed bug where if the template's parameter regex pattern was incorrect it would kill the script. Now it will gracefully ignore the bad pattern and still accept user data. The template will instead fail to deploy, however, at least user data is saved and it will be up to the platform team to fix the template.
+
+## v0.0.11 - 2025-08-27
 
 - Added delete.py script to delete pipelines and associated application stack
 - Added git pull and pushes to config.py and deploy.py
 - Added repository tags import to config.py
 
-## v0.0.7 (2025-06-10)
+## v0.0.7 - 2025-06-10
 
 Mostly stable. Still in Beta.
 
@@ -69,13 +73,13 @@ If `tag` is `v0.0.6`, but the extracted folder is `atlantis-cfn-configuration-re
 - GitHub sometimes strips the leading `v` from zip/folder names for tags like `v0.0.6`.
 - Adjust your code to check for both possibilities.
 
-## v0.0.6 (2025-06-09)
+## v0.0.6 - 2025-06-09
 
 Mostly stable. Still in Beta.
 
 - Fixed issue in update.py where if the AWS session token required a refresh, it would skip the requested pull
 
-## v0.0.5 (2025-06-07)
+## v0.0.5 - 2025-06-07
 
 Mostly stable. Still in Beta.
 
