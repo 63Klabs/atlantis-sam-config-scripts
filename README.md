@@ -1,4 +1,4 @@
-# Atlantis Configuration Repository for Serverless Deployments using AWS SAM
+# Atlantis SAM Configuration Scripts
 
 Atlantis provides a central repository structure and CLI to store, manage, and deploy supporting SAM configuration files for serverless infrastructure (such as pipelines, application storage, and CDN) across one or multiple AWS Accounts.
 
