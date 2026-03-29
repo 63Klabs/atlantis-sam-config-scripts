@@ -8,4 +8,4 @@
 
 ## Reporting a Vulnerability
 
-Report all vulnerabilities under the [Security menu in the Cache-Data GitHub repository](https://github.com/63klabs/atlantis-cfn-configuration-repo-for-serverless-deployments/security/advisories).
+Report all vulnerabilities under the [Security menu in the Cache-Data GitHub repository](https://github.com/63klabs/atlantis-sam-config-scripts/security/advisories).

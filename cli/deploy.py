@@ -8,7 +8,7 @@ VERSION = "v0.1.3/2025-08-26"
 # deploy.py -h
 
 # Full Documentation:
-# https://github.com/63klabs/atlantis-cfn-configuration-repo-for-serverless-deployments/
+# https://github.com/63klabs/atlantis-sam-config-scripts/
 
 import sys
 import os

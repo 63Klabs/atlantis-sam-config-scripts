@@ -8,7 +8,7 @@ VERSION = "v0.1.7/2026-03-26"
 # config.py -h
 
 # Full Documentation:
-# https://github.com/63klabs/atlantis-cfn-configuration-repo-for-serverless-deployments/
+# https://github.com/63klabs/atlantis-sam-config-scripts/
 
 import toml
 import json

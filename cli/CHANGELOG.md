@@ -10,7 +10,7 @@ To update your local cli scripts from GitHub repository:
 - There may be several versions with small fixes released every so often until reaching v0.1.0.
 - After v0.1.0 all v0.0.x version change information will be removed from the Changelog.
 - Refer to [TODO](./TODO.md) for upcoming BETA fixes and features.
-- Report any issues not covered in TODO via the [Issues page in the GitHub repository](https://github.com/63Klabs/atlantis-cfn-configuration-repo-for-serverless-deployments/issues)
+- Report any issues not covered in TODO via the [Issues page in the GitHub repository](https://github.com/63Klabs/atlantis-sam-config-scripts/issues)
 
 ## v0.0.15 - unreleased
 
@@ -43,7 +43,7 @@ Thank you for the detailed info and the direct observation.
 You are correct: **the downloaded file is named**  
 
 ```
-atlantis-cfn-configuration-repo-for-serverless-deployments-0.0.6.zip
+atlantis-sam-config-scripts-0.0.6.zip
 ```
 **even though the tag is `v0.0.6`.**
 
@@ -66,7 +66,7 @@ Your code currently does:
 zipped_dir = f"{repo}-{tag}/"
 ```
 
-If `tag` is `v0.0.6`, but the extracted folder is `atlantis-cfn-configuration-repo-for-serverless-deployments-0.0.6/`, your code will not find the right directory.
+If `tag` is `v0.0.6`, but the extracted folder is `atlantis-sam-config-scripts-0.0.6/`, your code will not find the right directory.
 
 #### Summary
 

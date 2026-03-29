@@ -7,7 +7,7 @@ VERSION = "v0.0.1/2025-08-08"
 # report_pipelines_managed_arns_param.py -h
 
 # Full Documentation:
-# https://github.com/63klabs/atlantis-cfn-configuration-repo-for-serverless-deployments/
+# https://github.com/63klabs/atlantis-sam-config-scripts/
 
 import sys
 import argparse

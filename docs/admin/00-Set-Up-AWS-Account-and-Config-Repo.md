@@ -12,7 +12,7 @@ Then, download and extract the Atlantis Platform CloudFormation Configuration Re
 
 ```bash
 # Downloads and extracts files for the repository
-curl -L -o repo.zip "https://github.com/63klabs/atlantis-cfn-configuration-repo-for-serverless-deployments/archive/refs/heads/main.zip" && unzip -o repo.zip && DIR=$(ls -d */ | head -1) && mv "${DIR}docs" . && mv "${DIR}cli" . && mv "${DIR}defaults" . && mv "${DIR}README.md" . && mv "${DIR}.gitignore" . 2>/dev/null && rm -rf repo.zip && rm -rf "$DIR"
+curl -L -o repo.zip "https://github.com/63klabs/atlantis-sam-config-scripts/archive/refs/heads/main.zip" && unzip -o repo.zip && DIR=$(ls -d */ | head -1) && mv "${DIR}docs" . && mv "${DIR}cli" . && mv "${DIR}defaults" . && mv "${DIR}README.md" . && mv "${DIR}.gitignore" . 2>/dev/null && rm -rf repo.zip && rm -rf "$DIR"
 ```
 
 > Note: The above command pulls the latest commit from the 63Klabs repository. You can point it to a `zip` in the releases as well. However, in the end you will set up the location to retrieve updates in the settings (release, main, S3), so once you run the `update.py` script you will get the version/release you desire.
@@ -144,7 +144,7 @@ Out of the box you can use the public templates provided by 63klabs. This is rec
 
 This is an S3 bucket that acts as a central source containing all the templates and template modules to be used for pipelines, storage, roles, and networks.
 
-If you or or organization wants to manage your own S3 bucket of templates, you can use the deployment scripts and templates found on [Atlantis Template Repository for Serverless Deployments using AWS SAM and CloudFormation](https://github.com/63Klabs/atlantis-cfn-template-repo-for-serverless-deployments) which is the source repository for the 63klabs bucket.
+If you or or organization wants to manage your own S3 bucket of templates, you can use the deployment scripts and templates found on [Atlantis Template Repository for Serverless Deployments using AWS SAM and CloudFormation](https://github.com/63Klabs/atlantis-sam-templates) which is the source repository for the 63klabs bucket.
 
 Because the 63klabs bucket is public, `anonymous` is set to `true`. When using your own private bucket set it to `false` and ensure your developers have permission to access it when running the cli commands for configuration and deployments.
 
@@ -195,7 +195,7 @@ If provider is `codecommit` when running the `create_repo` script then a CodeCom
 ```json
 {
 	"updates": {
-		"source": "https://github.com/63klabs/atlantis-cfn-configuration-repo-for-serverless-deployments",
+		"source": "https://github.com/63klabs/atlantis-sam-config-scripts",
 		"ver": "release:latest",
 		"target_dirs": ["docs", "cli"]
 	}

@@ -77,10 +77,10 @@ class GitHubUtils:
             if len(parts) >= 3:
                 owner = parts[1]
                 repo = parts[2]
-                # Extract tag if present: https://github.com/63Klabs/atlantis-cfn-configuration-repo-for-serverless-deployments/releases/tag/0.0.8-beta
+                # Extract tag if present: https://github.com/63Klabs/atlantis-sam-config-scripts/releases/tag/0.0.8-beta
                 if len(parts) >= 5 and parts[3] == "releases" and parts[4] == "tag":
                     tag = parts[5]
-                # https://github.com/63Klabs/atlantis-cfn-configuration-repo-for-serverless-deployments/archive/refs/tags/0.0.8-beta.zip
+                # https://github.com/63Klabs/atlantis-sam-config-scripts/archive/refs/tags/0.0.8-beta.zip
                 elif len(parts) >= 7 and parts[3] == "archive" and parts[4] == "refs" and parts[5] == "tags":
                     tag = parts[6].split(".")[0]
 

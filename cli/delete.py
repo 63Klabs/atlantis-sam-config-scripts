@@ -7,7 +7,7 @@ VERSION = "v0.0.3/2025-08-26"
 # delete.py -h
 
 # Full Documentation:
-# https://github.com/chadkluck/atlantis-cfn-configuration-repo-for-serverless-deployments/
+# https://github.com/chadkluck/atlantis-sam-config-scripts/
 
 import toml
 import sys

@@ -29,7 +29,7 @@ if sys.version_info[0] < 3:
 ScriptLogger.setup('update')
 
 # Directories to update
-DEFAULT_GITHUB_REPO = "63klabs/atlantis-cfn-configuration-repo-for-serverless-deployments"
+DEFAULT_GITHUB_REPO = "63klabs/atlantis-sam-config-scripts"
 DEFAULT_S3_BUCKET = "63klabs"
 DEFAULT_S3_PATH = "/atlantis/utilities/v2/"
 
@@ -169,8 +169,8 @@ class UpdateManager:
     def update_source(self, source: str, src_type: str, ver: str) -> str:
         """Using the source, src_type, and ver, generate the full urls needed"""
 
-        # https://github.com/63klabs/atlantis-cfn-configuration-repo-for-serverless-deployments/archive/refs/heads/main.zip
-        # https://github.com/63klabs/atlantis-cfn-configuration-repo-for-serverless-deployments/archive/refs/tags/v1.1.4.zip
+        # https://github.com/63klabs/atlantis-sam-config-scripts/archive/refs/heads/main.zip
+        # https://github.com/63klabs/atlantis-sam-config-scripts/archive/refs/tags/v1.1.4.zip
         # s3://63klabs/atlantis/utilities/v2/config_cli.zip
 
         if src_type == "github":
@@ -756,7 +756,7 @@ Otherwise, you can customize where updates are downloaded from:
 
 {
 	"updates": {
-		"source": "https://github.com/63klabs/atlantis-cfn-configuration-repo-for-serverless-deployments",
+		"source": "https://github.com/63klabs/atlantis-sam-config-scripts",
 		"ver": "release:latest",
 		"target_dirs": [ "docs", "cli" ]
 }
@@ -766,7 +766,7 @@ Otherwise, you can customize where updates are downloaded from:
 
 {
 	"updates": {
-		"source": "https://github.com/63klabs/atlantis-cfn-configuration-repo-for-serverless-deployments",
+		"source": "https://github.com/63klabs/atlantis-sam-config-scripts",
 		"ver": "commit:latest",
 		"target_dirs": [ "docs", "cli" ]
 	}
@@ -797,9 +797,9 @@ Otherwise, you can customize where updates are downloaded from:
 	}
 }
 
-https://github.com/63klabs/atlantis-cfn-configuration-repo-for-serverless-deployments
-https://github.com/63klabs/atlantis-cfn-configuration-repo-for-serverless-deployments/archive/refs/heads/main.zip
-https://github.com/63klabs/atlantis-cfn-configuration-repo-for-serverless-deployments/archive/refs/tags/v0.0.1.zip
+https://github.com/63klabs/atlantis-sam-config-scripts
+https://github.com/63klabs/atlantis-sam-config-scripts/archive/refs/heads/main.zip
+https://github.com/63klabs/atlantis-sam-config-scripts/archive/refs/tags/v0.0.1.zip
 s3://63klabs/atlantis/utilities/v2/config_cli.zip
 s3://63klabs # since this is known, the script will fill in the path itself
 

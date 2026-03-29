@@ -244,7 +244,7 @@ The following settings may be updated in the `defaults/settings.json` file:
 ```json
 {
 	"updates": {
-		"source": "https://github.com/63klabs/atlantis-cfn-configuration-repo-for-serverless-deployments",
+		"source": "https://github.com/63klabs/atlantis-sam-config-scripts",
 		"ver": "release:latest",
 		"target_dirs": ["docs", "cli"]
 	},
