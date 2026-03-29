@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-VERSION = "v0.1.6/2025-09-03"
+VERSION = "v0.1.7/2026-03-26"
 # Created by Chad Kluck with AI assistance from Amazon Q Developer
 # GitHub Copilot assisted in color formats of output and prompts
 
@@ -502,8 +502,12 @@ class ConfigManager:
         if param_type in ['String', 'AWS::SSM::Parameter::Value<String>']:
             # Check AllowedPattern if defined
             allowed_pattern = param_def.get('AllowedPattern')
-            if allowed_pattern and not re.match(allowed_pattern, value):
-                return {"reason": f"Value must match pattern: {allowed_pattern}", "valid": False}
+            if allowed_pattern:
+                try:
+                    if not re.match(allowed_pattern, value):
+                        return {"reason": f"Value must match pattern: {allowed_pattern}", "valid": False}
+                except re.error as e:
+                    Log.warning(f"Invalid AllowedPattern regex for parameter: {allowed_pattern} ({e})")
             
             min_length = int(param_def.get('MinLength', 0))
             # Handle MaxLength differently - if not specified, use None instead of infinity
@@ -539,9 +543,12 @@ class ConfigManager:
             # Check AllowedPattern against each item if defined
             allowed_pattern = param_def.get('AllowedPattern')
             if allowed_pattern:
-                for i, item in enumerate(items, 1):
-                    if not re.match(allowed_pattern, item):
-                        return {"reason": f"Element {i} ('{item}') must match pattern: {allowed_pattern}", "valid": False}
+                try:
+                    for i, item in enumerate(items, 1):
+                        if not re.match(allowed_pattern, item):
+                            return {"reason": f"Element {i} ('{item}') must match pattern: {allowed_pattern}", "valid": False}
+                except re.error as e:
+                    Log.warning(f"Invalid AllowedPattern regex for parameter: {allowed_pattern} ({e})")
                 
         elif param_type == 'List<Number>':
             try:
