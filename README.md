@@ -63,7 +63,7 @@ It also assumes an [account administrator](#account-admins) has already set up a
 The SAM Config repository for use with the Atlantis Platform should already be set up in your organization. Look for a repository with a `sam_config` or similar name.
 
 1. Clone your organizations SAM Config repository
-2. Install and execute the scripts [Instructions here](./docs/00-Set-Up-Local-Environment.md#set-up-python)
+2. Install and execute the scripts [Instructions here](./docs/00-Set-Up-Local-Environment.md)
 
 You're all set!
 
@@ -275,7 +275,7 @@ Finally, the delete script has several steps where it prompts for confirmation, 
 
 ## Account Admins
 
-If you are an account admin needing to set-up and maintain this repository for your organization, see [Account Admin Documentation](./docs/admin/00-Set-Up-AWS-Account-and-Config-Repo.md).
+If you are an account admin needing to set-up and maintain this repository for your organization, refer to [Atlantis Platform Administration](https://github.com/63klabs/atlantis-platform-admin).
 
 ## License
 
@@ -289,4 +289,5 @@ If you discover any security related issues, please see the [SECURITY](SECURITY)
 
 Contributions are welcome! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
 
-- [Chad Kluck](https://chadkluck.me)
+- [Chad Kluck](https://github.com/chadkluck)
+- [63Klabs](https://github.com/63klabs)
