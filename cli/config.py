@@ -20,6 +20,7 @@ import shlex
 import click
 import hashlib
 import argparse
+import subprocess
 import traceback
 from pathlib import Path
 from typing import Dict, Optional, List, Tuple
@@ -576,6 +577,147 @@ class ConfigManager:
         
         return {"reason": "Valid", "valid": True}
 
+    def validate_all_parameters(self, skeleton: Dict, parameters: Dict) -> List[Dict]:
+        """
+        Validate all parameter values from skeleton against template constraints.
+
+        Iterates over all parameter_overrides in the skeleton, calls validate_parameter()
+        for each, and collects ALL failures rather than stopping at the first.
+
+        Args:
+            skeleton: Parsed skeleton file content
+            parameters: Template parameter definitions
+
+        Returns:
+            List[Dict]: List of validation failures, each with keys:
+                - parameter: parameter name
+                - value: provided value
+                - reason: constraint violation description
+            Empty list means all valid.
+        """
+        failures = []
+
+        # Extract parameter_overrides from the skeleton structure
+        # Structure: deployments.{stage_id}.deploy.parameters.parameter_overrides
+        deployments = skeleton.get('deployments', {})
+        for stage_id, stage_config in deployments.items():
+            parameter_overrides = (
+                stage_config.get('deploy', {})
+                .get('parameters', {})
+                .get('parameter_overrides', {})
+            )
+
+            for param_name, value in parameter_overrides.items():
+                param_def = parameters.get(param_name, {})
+                if not param_def:
+                    # Parameter not found in template — skip validation
+                    # (it may be an extra parameter that the template doesn't define)
+                    continue
+
+                result = self.validate_parameter(str(value), param_def)
+                if not result.get('valid', False):
+                    failures.append({
+                        'parameter': param_name,
+                        'value': value,
+                        'reason': result.get('reason', 'Unknown validation failure')
+                    })
+
+        return failures
+
+    def validate_atlantis_deploy_params(self, atlantis_params: Dict) -> List[Dict]:
+        """
+        Validate atlantis deploy parameters (s3_bucket, region, role_arn, confirm_changeset).
+
+        Reuses the same validation rules as gather_atlantis_deploy_parameters() but
+        without prompting. Used in headless mode to validate all deploy parameters
+        up front and report all failures at once.
+
+        Args:
+            atlantis_params (Dict): Dictionary with keys like s3_bucket, region,
+                role_arn, confirm_changeset.
+
+        Returns:
+            List[Dict]: Validation failures, each with keys:
+                - parameter: parameter name
+                - value: provided value
+                - reason: constraint violation description
+            Empty list means all valid.
+        """
+        failures = []
+
+        # Validate s3_bucket
+        s3_bucket = atlantis_params.get('s3_bucket', '')
+        if not s3_bucket:
+            failures.append({
+                'parameter': 's3_bucket',
+                'value': s3_bucket,
+                'reason': 'S3 bucket name is required'
+            })
+        else:
+            if not (3 <= len(s3_bucket) <= 63):
+                failures.append({
+                    'parameter': 's3_bucket',
+                    'value': s3_bucket,
+                    'reason': 'S3 bucket name must be between 3 and 63 characters'
+                })
+            elif not s3_bucket.islower():
+                failures.append({
+                    'parameter': 's3_bucket',
+                    'value': s3_bucket,
+                    'reason': 'S3 bucket name must be lowercase'
+                })
+            elif not all(c.isalnum() or c == '-' for c in s3_bucket):
+                failures.append({
+                    'parameter': 's3_bucket',
+                    'value': s3_bucket,
+                    'reason': 'S3 bucket name must contain only lowercase alphanumeric characters or hyphens'
+                })
+            elif s3_bucket.startswith('-') or s3_bucket.endswith('-'):
+                failures.append({
+                    'parameter': 's3_bucket',
+                    'value': s3_bucket,
+                    'reason': 'S3 bucket name must not start or end with a hyphen'
+                })
+
+        # Validate region
+        region = atlantis_params.get('region', '')
+        valid_regions = self.settings.get('regions', ['us-east-1'])
+        if region not in valid_regions:
+            failures.append({
+                'parameter': 'region',
+                'value': region,
+                'reason': f'Region must be one of: {", ".join(valid_regions)}'
+            })
+
+        # Validate role_arn (only if present in params)
+        if 'role_arn' in atlantis_params:
+            role_arn = atlantis_params['role_arn']
+            if not role_arn:
+                failures.append({
+                    'parameter': 'role_arn',
+                    'value': role_arn,
+                    'reason': 'Role ARN is required'
+                })
+            elif not (role_arn.startswith('arn:aws:iam::') and
+                      ':role/' in role_arn and
+                      len(role_arn.split(':')) == 6):
+                failures.append({
+                    'parameter': 'role_arn',
+                    'value': role_arn,
+                    'reason': 'Role ARN must match format: arn:aws:iam::<account-id>:role/<role-name>'
+                })
+
+        # Validate confirm_changeset
+        confirm_changeset = atlantis_params.get('confirm_changeset', '')
+        if str(confirm_changeset).lower() not in ('true', 'false'):
+            failures.append({
+                'parameter': 'confirm_changeset',
+                'value': str(confirm_changeset),
+                'reason': 'confirm_changeset must be "true" or "false"'
+            })
+
+        return failures
+
     # -------------------------------------------------------------------------
     # - Deployed Stack Utilities
     # -------------------------------------------------------------------------
@@ -978,6 +1120,214 @@ class ConfigManager:
         except Exception as e:
             Log.error(f"Error getting default tags: {str(e)}")
             raise
+
+    def get_user_editable_tags(self, all_tags: List[Dict]) -> Dict:
+        """Filter tags to only user-editable ones for skeleton file.
+
+        Excludes reserved Atlantis tags (e.g., tags starting with 'Atlantis'
+        or 'atlantis:', and other reserved keys like Provisioner, Name, Stage, etc.)
+
+        Args:
+            all_tags (List[Dict]): List of tags in CloudFormation format
+                [{"Key": "k", "Value": "v"}, ...]
+
+        Returns:
+            Dict: Flat {"Key": "Value"} dict of user-editable tags only
+        """
+        return {
+            tag['Key']: tag['Value']
+            for tag in all_tags
+            if not TagUtils.is_atlantis_reserved_tag(tag['Key'])
+        }
+
+    # -------------------------------------------------------------------------
+    # - Skeleton Generation
+    # -------------------------------------------------------------------------
+
+    def generate_skeleton(self, template_file: str, parameter_groups: List,
+                          parameters: Dict, verbose: bool = False) -> Dict:
+        """
+        Generate a skeleton configuration dictionary.
+
+        Args:
+            template_file: Selected template (full S3 URI with versionId, or local filename)
+            parameter_groups: Parameter groups from template
+            parameters: Template parameter definitions
+            verbose: If True, include parameter metadata section
+
+        Returns:
+            Dict: Skeleton structure ready for JSON serialization
+        """
+        # Load existing samconfig if available
+        local_config = self.read_samconfig()
+
+        # Load defaults hierarchy
+        config_loader = DefaultsLoader(
+            settings_dir=self.get_settings_dir(),
+            prefix=self.prefix,
+            project_id=self.project_id,
+            infra_type=self.infra_type
+        )
+        defaults = config_loader.load_defaults()
+
+        # Calculate stage-derived defaults
+        stage_defaults = self.calculate_stage_defaults(self.stage_id)
+
+        # --- Build atlantis deploy parameters ---
+        atlantis_deploy_params = {}
+
+        # Start with defaults hierarchy for atlantis params
+        atlantis_defaults = defaults.get('atlantis', {})
+        atlantis_deploy_params['s3_bucket'] = atlantis_defaults.get('s3_bucket', '')
+        atlantis_deploy_params['region'] = atlantis_defaults.get('region', '')
+
+        # Override with samconfig values if available
+        if local_config:
+            samconfig_atlantis = local_config.get('atlantis', {}).get('deploy', {}).get('parameters', {})
+            if samconfig_atlantis.get('s3_bucket'):
+                atlantis_deploy_params['s3_bucket'] = samconfig_atlantis['s3_bucket']
+            if samconfig_atlantis.get('region'):
+                atlantis_deploy_params['region'] = samconfig_atlantis['region']
+            if samconfig_atlantis.get('role_arn'):
+                atlantis_deploy_params['role_arn'] = samconfig_atlantis['role_arn']
+            if 'confirm_changeset' in samconfig_atlantis:
+                atlantis_deploy_params['confirm_changeset'] = samconfig_atlantis['confirm_changeset']
+
+        # Set role_arn from defaults if not already set from samconfig
+        if 'role_arn' not in atlantis_deploy_params:
+            if self.infra_type == 'storage' and atlantis_defaults.get('StorageServiceRoleArn'):
+                atlantis_deploy_params['role_arn'] = atlantis_defaults['StorageServiceRoleArn']
+            elif self.infra_type == 'pipeline' and atlantis_defaults.get('PipelineServiceRoleArn'):
+                atlantis_deploy_params['role_arn'] = atlantis_defaults['PipelineServiceRoleArn']
+            elif atlantis_defaults.get('role_arn'):
+                atlantis_deploy_params['role_arn'] = atlantis_defaults['role_arn']
+
+        # Store template_file: full S3 URI with versionId for S3, filename only for local
+        if template_file.startswith('s3://'):
+            atlantis_deploy_params['template_file'] = template_file
+        else:
+            # For local templates, store just the filename
+            atlantis_deploy_params['template_file'] = template_file.split('/')[-1] if '/' in template_file else template_file
+
+        # Set capabilities and confirm_changeset defaults
+        atlantis_deploy_params['capabilities'] = 'CAPABILITY_NAMED_IAM'
+        if 'confirm_changeset' not in atlantis_deploy_params:
+            atlantis_deploy_params['confirm_changeset'] = True
+
+        # Build the atlantis section
+        atlantis_section = {
+            'template_file': atlantis_deploy_params['template_file'],
+            's3_bucket': atlantis_deploy_params['s3_bucket'],
+            'region': atlantis_deploy_params['region'],
+            'capabilities': atlantis_deploy_params['capabilities'],
+            'confirm_changeset': atlantis_deploy_params['confirm_changeset'],
+        }
+
+        # Add role_arn only for pipeline and storage infra types
+        if self.infra_type in ['pipeline', 'storage'] and atlantis_deploy_params.get('role_arn'):
+            atlantis_section['role_arn'] = atlantis_deploy_params['role_arn']
+
+        # --- Build parameter_overrides ---
+        parameter_overrides = {}
+
+        # Start with stage-calculated defaults
+        parameter_overrides.update(stage_defaults)
+
+        # Merge defaults hierarchy parameter_overrides
+        parameter_overrides.update(defaults.get('parameter_overrides', {}))
+
+        # Override with samconfig values if available
+        if local_config:
+            samconfig_params = local_config.get('deployments', {}).get(
+                self.stage_id, {}
+            ).get('deploy', {}).get('parameters', {}).get('parameter_overrides', {})
+            parameter_overrides.update(samconfig_params)
+
+        # Set Prefix, ProjectId, StageId from instance values
+        if 'Prefix' in parameters:
+            parameter_overrides['Prefix'] = self.prefix
+        if 'ProjectId' in parameters:
+            parameter_overrides['ProjectId'] = self.project_id
+        if 'StageId' in parameters and self.stage_id != 'default':
+            parameter_overrides['StageId'] = self.stage_id
+
+        # Ensure all template parameters have an entry (use Default from template if available)
+        for param_name, param_def in parameters.items():
+            if param_name not in parameter_overrides:
+                parameter_overrides[param_name] = param_def.get('Default', '')
+
+        # --- Build tags ---
+        # Get default tags from settings and defaults hierarchy
+        tag_defaults = TagUtils.get_default_tags(self.settings, defaults)
+        tag_list = TagUtils.tags_as_list(tag_defaults)
+
+        # Merge with samconfig tags if available
+        if local_config:
+            samconfig_tags = local_config.get('deployments', {}).get(
+                self.stage_id, {}
+            ).get('deploy', {}).get('parameters', {}).get('tags', [])
+            if samconfig_tags:
+                tag_list = self.merge_tags(tag_list, samconfig_tags)
+
+        # Filter to user-editable tags only
+        tags = self.get_user_editable_tags(tag_list)
+
+        # --- Build stack_name and s3_prefix ---
+        stack_name = self.get_stack_name()
+
+        # --- Assemble skeleton ---
+        skeleton = {
+            'atlantis': {
+                'deploy': {
+                    'parameters': atlantis_section
+                }
+            },
+            'applyTemplateUpdateIfAvailable': 'y',
+            'deployments': {
+                self.stage_id: {
+                    'deploy': {
+                        'parameters': {
+                            'stack_name': stack_name,
+                            's3_prefix': stack_name,
+                            'parameter_overrides': parameter_overrides,
+                            'tags': tags
+                        }
+                    }
+                }
+            }
+        }
+
+        # --- Build _parameter_metadata if verbose ---
+        if verbose:
+            metadata = {}
+            for param_name, param_def in parameters.items():
+                entry = {'Type': param_def.get('Type', 'String')}
+
+                # Include optional fields only if defined
+                if 'Description' in param_def:
+                    entry['Description'] = param_def['Description']
+                if 'Default' in param_def:
+                    entry['Default'] = param_def['Default']
+                if 'AllowedValues' in param_def:
+                    entry['AllowedValues'] = param_def['AllowedValues']
+                if 'AllowedPattern' in param_def:
+                    entry['AllowedPattern'] = param_def['AllowedPattern']
+                if 'MinLength' in param_def:
+                    entry['MinLength'] = param_def['MinLength']
+                if 'MaxLength' in param_def:
+                    entry['MaxLength'] = param_def['MaxLength']
+                if 'MinValue' in param_def:
+                    entry['MinValue'] = param_def['MinValue']
+                if 'MaxValue' in param_def:
+                    entry['MaxValue'] = param_def['MaxValue']
+                if 'ConstraintDescription' in param_def:
+                    entry['ConstraintDescription'] = param_def['ConstraintDescription']
+
+                metadata[param_name] = entry
+
+            skeleton['_parameter_metadata'] = metadata
+
+        return skeleton
 
     # -------------------------------------------------------------------------
     # - Parse, Stringify, and Process Parameter Overrides and Tags
@@ -1647,6 +1997,96 @@ class ConfigManager:
         
         return config
 
+    def build_config_headless(self, infra_type: str, template_file: str,
+                              atlantis_params: Dict, parameter_values: Dict,
+                              tags: List[Dict], local_config: Dict) -> Dict:
+        """
+        Build config without interactive prompts.
+        Mirrors build_config() but skips gather_atlantis_deploy_parameters().
+
+        Args:
+            infra_type (str): Type of infrastructure (e.g., 'pipeline', 'storage', 'network', 'service-role')
+            template_file (str): Template file path or S3 URI
+            atlantis_params (Dict): Pre-validated atlantis deploy parameters with keys:
+                s3_bucket, region, capabilities, confirm_changeset, role_arn (for pipeline/storage)
+            parameter_values (Dict): Pre-validated parameter_overrides from skeleton
+            tags (List[Dict]): Tags in CloudFormation format [{"Key": k, "Value": v}]
+            local_config (Dict): Existing samconfig data (or empty dict)
+
+        Returns:
+            Dict: Config dictionary ready for save_config()
+        """
+        prefix = parameter_values.get('Prefix', '')
+        project_id = parameter_values.get('ProjectId', '')
+        if parameter_values.get('StageId', '') != '':
+            stage_id = parameter_values.get('StageId', '')
+        else:
+            stage_id = self.stage_id
+
+        # In headless mode, we always start fresh for the current deployment
+        # but preserve other deployments from local_config if prefix/project match
+        if not isinstance(local_config, dict) or prefix != self.prefix or (project_id and project_id != self.project_id):
+            deployments = {}
+        else:
+            deployments = local_config.get('deployments', {})
+
+        # if template_file is not s3 it is local and use the local path
+        if not template_file.startswith('s3://'):
+            file_path = f'{self.get_templates_dir()}/{template_file}'
+            template_file = os.path.relpath(file_path, self.get_samconfig_dir())
+
+        # Generate stack name
+        stack_name = self.get_stack_name()
+
+        # Generate automated tags merged with user-provided tags
+        merged_tags = self.generate_tags(parameter_values, tags)
+
+        # Build atlantis default deploy parameters
+        confirm_changeset = atlantis_params.get('confirm_changeset', 'true')
+        if isinstance(confirm_changeset, str):
+            confirm_changeset_bool = (confirm_changeset.lower() == 'true')
+        else:
+            confirm_changeset_bool = bool(confirm_changeset)
+
+        atlantis_default_deploy_parameters = {
+            'template_file': template_file,
+            's3_bucket': atlantis_params['s3_bucket'],
+            'region': atlantis_params['region'],
+            'capabilities': atlantis_params.get('capabilities', 'CAPABILITY_NAMED_IAM'),
+            'confirm_changeset': confirm_changeset_bool
+        }
+
+        # Build deployment parameters for the current stage
+        deployment_parameters = atlantis_default_deploy_parameters.copy()
+        deployment_parameters.update({
+            'stack_name': stack_name,
+            's3_prefix': stack_name,
+            'parameter_overrides': parameter_values,
+            'tags': merged_tags
+        })
+
+        deployments[stage_id] = {
+            'deploy': {
+                'parameters': deployment_parameters
+            }
+        }
+
+        # Build the config structure
+        config = {
+            'atlantis': {
+                'deploy': {
+                    'parameters': atlantis_default_deploy_parameters
+                }
+            },
+            'deployments': deployments
+        }
+
+        # Add role_arn if this is a pipeline or storage deployment
+        if infra_type in ['pipeline', 'storage']:
+            config['atlantis']['deploy']['parameters']['role_arn'] = atlantis_params.get('role_arn', '')
+
+        return config
+
     def get_sam_deploy_command(self, stage_id: str) -> str:
         ### Get sam deploy command ###
         return f"sam deploy --config-env {stage_id} --config-file {self.get_samconfig_file_name()} --profile {self.profile}"
@@ -2100,6 +2540,24 @@ class ConfigManager:
         script_dir = Path(__file__).resolve().parent
         return script_dir.parent / TEMPLATES_DIR / self.infra_type
 
+    def get_skeleton_file_path(self) -> Path:
+        """
+        Get the skeleton file path based on infra_type naming rules.
+
+        Returns:
+            Path: e.g. local-init/acme-myproject-dev-pipeline.json
+                  or   local-init/acme-myproject-storage.json
+        """
+        script_dir = Path(__file__).resolve().parent
+        local_init_dir = script_dir.parent / "local-init"
+
+        if self.infra_type in ['pipeline', 'network']:
+            filename = f"{self.prefix}-{self.project_id}-{self.stage_id}-{self.infra_type}.json"
+        else:
+            filename = f"{self.prefix}-{self.project_id}-{self.infra_type}.json"
+
+        return local_init_dir / filename
+
     # -------------------------------------------------------------------------
     # - Internal Utilities
     # -------------------------------------------------------------------------
@@ -2118,16 +2576,52 @@ For IAM users, please ensure your credentials are valid using 'aws configure'.
 For default parameter and tag values, add default.json files to the defaults directory.
 For settings, update settings.json in the defaults directory.
 
+Modes:
+    Interactive (default):
+        config.py <infra_type> <prefix> <project_id> [<stage_id>]
+
+    Skeleton Generation:
+        config.py <infra_type> <prefix> <project_id> [<stage_id>] --skeleton
+        config.py <infra_type> <prefix> <project_id> [<stage_id>] --skeleton-verbose
+
+    Headless Execution:
+        config.py <infra_type> <prefix> <project_id> [<stage_id>] --headless
+        config.py <infra_type> <prefix> <project_id> [<stage_id>] --headless --deploy
+
 Examples:
 
-    # Basic
-    config.py <infra_type> <prefix> <project_id> [<stage_id>] 
-    
+    # Basic interactive mode
+    config.py <infra_type> <prefix> <project_id> [<stage_id>]
+
     # Use specific AWS profile
     config.py <infra_type> <prefix> <project_id> [<stage_id>] --profile <yourprofile>
-        
+
     # Check saved configuration against deployed stack
-    config.py <infra_type> <prefix> <project_id> [<stage_id>] --profile <yourprofile> --check-stack    
+    config.py <infra_type> <prefix> <project_id> [<stage_id>] --profile <yourprofile> --check-stack
+
+    # Generate a skeleton configuration file for headless mode
+    config.py pipeline acme myapp dev --skeleton
+
+    # Generate skeleton with parameter metadata (descriptions, constraints)
+    config.py pipeline acme myapp dev --skeleton-verbose
+
+    # Run in headless mode using a skeleton file (no prompts)
+    config.py pipeline acme myapp dev --headless
+
+    # Run headless and trigger deployment after configuration
+    config.py pipeline acme myapp dev --headless --deploy
+
+Workflow:
+    1. Generate skeleton:  config.py pipeline acme myapp dev --skeleton-verbose
+    2. Edit skeleton:      vi local-init/acme-myapp-dev-pipeline.json
+    3. Run headless:       config.py pipeline acme myapp dev --headless --deploy
+
+Notes:
+    --skeleton/--skeleton-verbose and --headless are mutually exclusive.
+    --check-stack is incompatible with --skeleton, --skeleton-verbose, and --headless.
+    --deploy only takes effect when paired with --headless.
+    --skeleton-verbose includes parameter descriptions and constraints in the skeleton.
+    If both --skeleton and --skeleton-verbose are provided, --skeleton-verbose wins.
 
 """
 
@@ -2175,15 +2669,378 @@ def parse_args() -> argparse.Namespace:
                         action='store_true',  # This makes it a flag
                         default=False,        # Default value when flag is not used
                         help='For an AWS SSO login session, whether or not to set the --no-browser flag.')
+    parser.add_argument('--skeleton',
+                        action='store_true',
+                        default=False,
+                        help='Generate a skeleton configuration file for headless mode')
+    parser.add_argument('--skeleton-verbose',
+                        action='store_true',
+                        default=False,
+                        help='Generate skeleton with parameter metadata (descriptions, constraints)')
+    parser.add_argument('--headless',
+                        action='store_true',
+                        default=False,
+                        help='Run in headless mode using a skeleton file (no prompts)')
+    parser.add_argument('--deploy',
+                        action='store_true',
+                        default=False,
+                        help='Trigger deployment after headless configuration (requires --headless)')
     
     args = parser.parse_args()
         
     return args
 
+def validate_mode_flags(args):
+    """Validate mutual exclusivity of mode flags. Exit on conflict."""
+    skeleton_mode = args.skeleton or args.skeleton_verbose
+    if skeleton_mode and args.headless:
+        sys.exit("Error: --skeleton/--skeleton-verbose and --headless are mutually exclusive")
+    if args.check_stack and (skeleton_mode or args.headless):
+        sys.exit("Error: --check-stack is incompatible with --skeleton/--skeleton-verbose/--headless")
+    # --skeleton + --skeleton-verbose = treat as --skeleton-verbose
+    if args.skeleton and args.skeleton_verbose:
+        args.skeleton = False  # skeleton_verbose subsumes skeleton
+
+
+def run_skeleton_mode(args):
+    """Run skeleton generation mode.
+
+    Orchestrates skeleton file generation:
+    1. Create local-init/ directory if it doesn't exist
+    2. Initialize ConfigManager (full init — needs AWS for S3 template discovery)
+    3. Discover templates and prompt user for selection (only interactive step)
+    4. Get template parameters via get_template_parameters()
+    5. Call generate_skeleton() to build skeleton dict
+    6. Check for existing file at target path, prompt overwrite if exists
+    7. Write JSON to local-init/ with indentation for readability
+
+    Args:
+        args: Parsed command-line arguments from parse_args()
+    """
+    # Determine the local-init directory path (project root / local-init)
+    script_dir = Path(__file__).resolve().parent
+    local_init_dir = script_dir.parent / "local-init"
+
+    # 1. Create local-init/ directory if it doesn't exist
+    os.makedirs(local_init_dir, exist_ok=True)
+
+    # 2. Initialize ConfigManager (full init — needs AWS for S3 template discovery)
+    try:
+        config_manager = ConfigManager(
+            args.infra_type, args.prefix,
+            args.project_id, args.stage_id,
+            args.profile, args.region,
+            False, args.no_browser
+        )
+    except TokenRetrievalError as e:
+        ConsoleAndLog.error(f"AWS authentication error: {str(e)}")
+        sys.exit(1)
+    except Exception as e:
+        ConsoleAndLog.error(f"Error initializing configuration manager: {str(e)}")
+        sys.exit(1)
+
+    # 3. Discover templates and prompt user for selection (only interactive step)
+    templates = config_manager.discover_templates()
+    template_file = FileNameListUtils.select_from_file_list(
+        templates,
+        heading_text="Available templates",
+        prompt_text="Enter a template number"
+    )
+    if template_file.startswith('s3://'):
+        template_file = config_manager.get_latest_version_id(template_file)
+
+    # 4. Get template parameters via get_template_parameters()
+    parameter_groups, parameters = config_manager.get_template_parameters(template_file)
+
+    # 5. Call generate_skeleton() to build skeleton dict
+    verbose = args.skeleton_verbose
+    skeleton = config_manager.generate_skeleton(
+        template_file, parameter_groups, parameters, verbose=verbose
+    )
+
+    # 6. Check for existing file at target path, prompt overwrite if exists
+    skeleton_path = config_manager.get_skeleton_file_path()
+    if skeleton_path.exists():
+        if not click.confirm(
+            f"Skeleton file already exists at {skeleton_path}. Overwrite?"
+        ):
+            click.echo("Skeleton generation cancelled.")
+            sys.exit(0)
+
+    # 7. Write JSON to local-init/ with indentation for readability
+    with open(skeleton_path, 'w') as f:
+        json.dump(skeleton, f, indent=2)
+
+    click.echo(f"Skeleton file written to {skeleton_path}")
+
+
+def run_headless_mode(args):
+    """Run headless configuration mode.
+
+    Orchestrates headless execution:
+    1. Git pull (automatic, exits on failure)
+    2. Initialize ConfigManager
+    3. Read and parse skeleton file from local-init/
+    4. Resolve template (check for update if applyTemplateUpdateIfAvailable == "y")
+    5. Get template parameters via get_template_parameters()
+    6. Validate ALL parameters — collect all errors, exit if any
+    7. Validate atlantis deploy parameters
+    8. Call build_config_headless() with pre-validated values
+    9. Call save_config()
+    10. Auto-save defaults (equivalent to check_for_default_json with "yes")
+    11. Delete skeleton file
+    12. Git commit & push (automatic, exits on failure)
+    13. If --deploy: invoke deploy.py --headless via subprocess
+
+    Args:
+        args: Parsed command-line arguments from parse_args()
+    """
+    # 1. Git pull — exits on failure
+    Git.headless_git_pull()
+
+    # 2. Initialize ConfigManager
+    try:
+        config_manager = ConfigManager(
+            args.infra_type, args.prefix,
+            args.project_id, args.stage_id,
+            args.profile, args.region,
+            False, args.no_browser
+        )
+    except TokenRetrievalError as e:
+        sys.exit(f"Error: initialization failed: AWS authentication error: {str(e)}")
+    except Exception as e:
+        sys.exit(f"Error: initialization failed: {str(e)}")
+
+    # 3. Read and parse skeleton file from local-init/
+    skeleton_path = config_manager.get_skeleton_file_path()
+    if not skeleton_path.exists():
+        sys.exit(f"Error: skeleton file not found: {skeleton_path}")
+
+    try:
+        with open(skeleton_path, 'r') as f:
+            skeleton = json.load(f)
+    except json.JSONDecodeError as e:
+        sys.exit(f"Error: skeleton file malformed JSON: {skeleton_path}: {str(e)}")
+    except Exception as e:
+        sys.exit(f"Error: skeleton file read failed: {skeleton_path}: {str(e)}")
+
+    # 4. Resolve template (check for update if applyTemplateUpdateIfAvailable == "y")
+    template_file = skeleton.get('atlantis', {}).get('deploy', {}).get('parameters', {}).get('template_file', '')
+    if not template_file:
+        sys.exit("Error: skeleton file missing template_file in atlantis.deploy.parameters")
+
+    apply_update = skeleton.get('applyTemplateUpdateIfAvailable', 'n')
+    if template_file.startswith('s3://'):
+        if apply_update == 'y':
+            template_file = config_manager.get_latest_version_id(template_file)
+        # If "n", use the versionId from skeleton as-is
+
+    # 5. Get template parameters via get_template_parameters()
+    parameter_groups, parameters = config_manager.get_template_parameters(template_file)
+    if not parameters:
+        sys.exit(f"Error: template retrieval failed: could not get parameters from {template_file}")
+
+    # 6. Validate ALL parameters — collect all errors, exit if any
+    param_failures = config_manager.validate_all_parameters(skeleton, parameters)
+
+    # 7. Validate atlantis deploy parameters
+    atlantis_params = skeleton.get('atlantis', {}).get('deploy', {}).get('parameters', {})
+    deploy_param_failures = config_manager.validate_atlantis_deploy_params(atlantis_params)
+
+    # Combine all failures and exit if any
+    all_failures = param_failures + deploy_param_failures
+    if all_failures:
+        error_lines = ["Error: validation failed:"]
+        for failure in all_failures:
+            error_lines.append(
+                f"  Parameter '{failure['parameter']}' value '{failure['value']}': {failure['reason']}"
+            )
+        sys.exit('\n'.join(error_lines))
+
+    # 8. Call build_config_headless() with pre-validated values
+    # Extract parameter_overrides from skeleton
+    stage_id = config_manager.stage_id
+    parameter_values = (
+        skeleton.get('deployments', {})
+        .get(stage_id, {})
+        .get('deploy', {})
+        .get('parameters', {})
+        .get('parameter_overrides', {})
+    )
+
+    # Extract tags from skeleton (dict format) and convert to List[Dict] format
+    tags_dict = (
+        skeleton.get('deployments', {})
+        .get(stage_id, {})
+        .get('deploy', {})
+        .get('parameters', {})
+        .get('tags', {})
+    )
+    tags = TagUtils.tags_as_list(tags_dict)
+
+    # Read existing samconfig for local_config
+    local_config = config_manager.read_samconfig() or {}
+
+    config = config_manager.build_config_headless(
+        args.infra_type, template_file,
+        atlantis_params, parameter_values,
+        tags, local_config
+    )
+
+    # 9. Call save_config()
+    config_manager.save_config(config)
+
+    # 10. Auto-save defaults (equivalent to check_for_default_json with "yes" answers)
+    _headless_auto_save_defaults(config_manager, config)
+
+    # 11. Delete skeleton file from local-init/
+    try:
+        skeleton_path.unlink()
+        Log.info(f"Deleted skeleton file: {skeleton_path}")
+    except Exception as e:
+        Log.warning(f"Failed to delete skeleton file: {skeleton_path}: {str(e)}")
+
+    # 12. Git commit & push — exits on failure
+    commit_message = f"Configured {args.infra_type} {config_manager.prefix}-{config_manager.project_id}"
+    if config_manager.stage_id and config_manager.stage_id != 'default':
+        commit_message += f"-{config_manager.stage_id}"
+    commit_message += " (headless)"
+    Git.headless_git_commit_and_push(commit_message)
+
+    # 13. If --deploy: invoke deploy.py --headless via subprocess with same positional args
+    if args.deploy:
+        script_dir = Path(__file__).resolve().parent
+        deploy_script = script_dir / "deploy.py"
+
+        deploy_cmd = [
+            sys.executable, str(deploy_script),
+            args.infra_type, args.prefix, args.project_id
+        ]
+        if args.stage_id:
+            deploy_cmd.append(args.stage_id)
+        deploy_cmd.append('--headless')
+        if args.profile:
+            deploy_cmd.extend(['--profile', args.profile])
+        if args.region:
+            deploy_cmd.extend(['--region', args.region])
+
+        Log.info(f"Invoking deploy script: {' '.join(deploy_cmd)}")
+        result = subprocess.run(deploy_cmd)
+        if result.returncode != 0:
+            sys.exit(result.returncode)
+
+
+def _headless_auto_save_defaults(config_manager, config):
+    """Auto-save defaults without prompting (headless equivalent of check_for_default_json).
+
+    In headless mode, we automatically save all applicable defaults
+    (equivalent to answering "yes" to all prompts in check_for_default_json).
+
+    Args:
+        config_manager: ConfigManager instance
+        config: The built config dictionary
+    """
+    defaults_path = config_manager.get_settings_dir() / "defaults.json"
+    prefix_defaults_path = config_manager.get_settings_dir() / f"{config_manager.prefix}-defaults.json"
+
+    # Create settings directory if it doesn't exist
+    os.makedirs(config_manager.get_settings_dir(), exist_ok=True)
+
+    # Get current parameters from config
+    parameter_values = (
+        config.get('deployments', {})
+        .get(config_manager.stage_id, {})
+        .get('deploy', {})
+        .get('parameters', {})
+        .get('parameter_overrides', {})
+    )
+    atlantis_params = config.get('atlantis', {}).get('deploy', {}).get('parameters', {})
+
+    current_params = {
+        "atlantis": atlantis_params,
+        "parameter_overrides": parameter_values
+    }
+
+    # Possible defaults to save
+    possible_defaults = [
+        {'name': 'atlantis', 'params': ['region', 's3_bucket']},
+        {'name': 'parameter_overrides', 'params': ['RolePath', 'ServiceRolePath', 'PermissionsBoundaryArn', 'S3BucketNameOrgPrefix', 'ParameterStoreHierarchy']}
+    ]
+
+    # Save to defaults.json (ALL scope)
+    default_file_data = config_manager.read_defaults_file(defaults_path)
+    if default_file_data:
+        for section in possible_defaults:
+            section_name = section['name']
+            section_params = section['params']
+            curr_deploy_params_for_section = current_params.get(section_name, {})
+
+            for param in section_params:
+                default_param = param
+                param_is_not_set = ("" == default_file_data.get(section_name, {}).get(default_param, ""))
+
+                if param in curr_deploy_params_for_section and param_is_not_set:
+                    if curr_deploy_params_for_section[param]:
+                        if section_name not in default_file_data:
+                            default_file_data[section_name] = {}
+                        default_file_data[section_name][default_param] = curr_deploy_params_for_section[param]
+
+        config_manager.write_defaults_file(defaults_path, default_file_data)
+
+    # Save to prefix-defaults.json (prefix scope — includes role_arn)
+    prefix_possible_defaults = [
+        {'name': 'atlantis', 'params': ['region', 's3_bucket', 'role_arn']},
+        {'name': 'parameter_overrides', 'params': ['RolePath', 'ServiceRolePath', 'PermissionsBoundaryArn', 'S3BucketNameOrgPrefix', 'ParameterStoreHierarchy']}
+    ]
+
+    prefix_default_file_data = config_manager.read_defaults_file(prefix_defaults_path)
+    if prefix_default_file_data:
+        skip_params = set()  # Track params already saved to defaults.json
+        for section in possible_defaults:
+            for param in section['params']:
+                curr_val = current_params.get(section['name'], {}).get(param, '')
+                if curr_val and default_file_data and default_file_data.get(section['name'], {}).get(param, '') == curr_val:
+                    skip_params.add((section['name'], param))
+
+        for section in prefix_possible_defaults:
+            section_name = section['name']
+            section_params = section['params']
+            curr_deploy_params_for_section = current_params.get(section_name, {})
+
+            for param in section_params:
+                if (section_name, param) in skip_params:
+                    continue
+
+                default_param = param
+                if param == 'role_arn':
+                    if config_manager.infra_type == 'storage':
+                        default_param = 'StorageServiceRoleArn'
+                    elif config_manager.infra_type == 'pipeline':
+                        default_param = 'PipelineServiceRoleArn'
+
+                param_is_not_set = ("" == prefix_default_file_data.get(section_name, {}).get(default_param, ""))
+
+                if param in curr_deploy_params_for_section and param_is_not_set:
+                    if curr_deploy_params_for_section[param]:
+                        if section_name not in prefix_default_file_data:
+                            prefix_default_file_data[section_name] = {}
+                        prefix_default_file_data[section_name][default_param] = curr_deploy_params_for_section[param]
+
+        config_manager.write_defaults_file(prefix_defaults_path, prefix_default_file_data)
+
+
 def main():
     
     try:
         args = parse_args()
+        validate_mode_flags(args)
+
+        # Route to skeleton or headless mode if flags are set
+        if args.skeleton or args.skeleton_verbose:
+            return run_skeleton_mode(args)
+        elif args.headless:
+            return run_headless_mode(args)
+
         Log.info(f"{sys.argv}")
         Log.info(f"Version: {VERSION}")
         

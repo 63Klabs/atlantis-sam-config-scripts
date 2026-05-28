@@ -12,6 +12,16 @@ To update your local cli scripts from GitHub repository:
 - Refer to [TODO](./TODO.md) for upcoming BETA fixes and features.
 - Report any issues not covered in TODO via the [Issues page in the GitHub repository](https://github.com/63Klabs/atlantis-sam-config-scripts/issues)
 
+## v0.0.17 (2026-06-01)
+
+- **config.py**: Added headless skeleton mode for CI/CD automation. Two new non-interactive execution modes:
+  - `--skeleton` / `--skeleton-verbose`: Generates a pre-populated JSON configuration file in `local-init/` with defaults and (optionally) parameter metadata. Only prompts for template selection.
+  - `--headless`: Reads a skeleton file, validates all parameters against template constraints, generates samconfig, performs git operations, and optionally triggers deployment — all without user prompts.
+  - `--deploy`: When paired with `--headless`, automatically invokes `deploy.py --headless` after successful configuration.
+- **deploy.py**: Added `--headless` flag that suppresses all prompts, auto-performs git pull/commit/push, and overrides `confirm_changeset` to false.
+- **Shared**: Added `headless_git_pull()` and `headless_git_commit_and_push()` to the Git class for non-interactive git operations.
+- Added `local-init/*` to `.gitignore` for temporary skeleton files.
+
 ## v0.0.16 (2026-04-03)
 
 - **config.py v0.1.7/2026-03-26**: Fixed bug where if the template's parameter regex pattern was incorrect it would kill the script. Now it will gracefully ignore the bad pattern and still accept user data. The template will instead fail to deploy, however, at least user data is saved and it will be up to the platform team to fix the template.

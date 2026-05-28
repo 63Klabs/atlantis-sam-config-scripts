@@ -47,6 +47,7 @@ class TemplateDeployer:
         self.project_id = project_id
         self.stage_id = stage_id
         self.profile = profile
+        self.override_confirm_changeset = False
 
         self.aws_session = AWSSessionManager(profile, None, no_browser)
         self.s3_client = self.aws_session.get_client('s3')
@@ -305,6 +306,9 @@ class TemplateDeployer:
             "--no-fail-on-empty-changeset"
         ]
         
+        if self.override_confirm_changeset:
+            sam_cmd.append("--no-confirm-changeset")
+
         if self.profile:
             sam_cmd.extend(["--profile", self.profile])
         
@@ -386,9 +390,18 @@ Examples:
     # With different AWS profile
     deploy.py service-role acme project123 --profile myprofile
 
+    # Headless mode (no prompts, auto git ops, force confirm_changeset=false)
+    deploy.py pipeline acme project123 dev --headless
+
     # Optional flags:
     --no-browser
-        For an AWS SSO login session, whether or not to set the --no-browser flag. 
+        For an AWS SSO login session, whether or not to set the --no-browser flag.
+
+    --headless
+        Run in headless mode for CI/CD pipelines and automation. Suppresses all
+        interactive prompts, automatically performs git pull before deployment and
+        git commit and push after successful deployment, and overrides
+        confirm_changeset to false regardless of samconfig value.
 """
         
 def parse_args() -> argparse.Namespace:
@@ -423,6 +436,10 @@ def parse_args() -> argparse.Namespace:
                         action='store_true',  # This makes it a flag
                         default=False,        # Default value when flag is not used
                         help='For an AWS SSO login session, whether or not to set the --no-browser flag.')
+    parser.add_argument('--headless',
+                        action='store_true',
+                        default=False,
+                        help='Run in headless mode: suppress prompts, auto git ops, force confirm_changeset=false')
 
     args = parser.parse_args()
     
@@ -434,8 +451,11 @@ def main() -> int:
     Log.info(f"{sys.argv}")
     Log.info(f"Version: {VERSION}")
 
-    # Git pull prompt
-    Git.prompt_git_pull()
+    # Git pull — headless performs automatically, interactive prompts
+    if args.headless:
+        Git.headless_git_pull()
+    else:
+        Git.prompt_git_pull()
 
     # Initialize deployer with profile if specified
     deployer = TemplateDeployer(
@@ -449,6 +469,10 @@ def main() -> int:
         # Get template URL from config file
         template_url = deployer.get_template_from_config()
         ConsoleAndLog.info(f"Template URL from config: {template_url}")
+
+        # In headless mode, override confirm_changeset to suppress prompts
+        if args.headless:
+            deployer.override_confirm_changeset = True
         
         exit_code = deployer.deploy_with_temp_template(template_url)
 
@@ -461,8 +485,12 @@ def main() -> int:
             commit_message = f"Deployed {args.infra_type} {args.prefix}-{args.project_id}"
             if args.stage_id:
                 commit_message += f"-{args.stage_id}"
-            print()
-            Git.git_commit_and_push(commit_message)
+
+            if args.headless:
+                Git.headless_git_commit_and_push(commit_message)
+            else:
+                print()
+                Git.git_commit_and_push(commit_message)
         else:
             ConsoleAndLog.error(f"Deployment script failed with exit code {exit_code}")
         return exit_code

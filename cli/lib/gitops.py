@@ -64,3 +64,40 @@ class Git:
         if click.confirm(Colorize.question("Perform git commit and push?"), default=True):
             commit_message = click.prompt(Colorize.question("Enter commit message"), commit_message, type=str)
             Git.git_commit_and_push(commit_message)
+
+    @staticmethod
+    def headless_git_pull() -> None:
+        """Perform git pull without prompting. Raises SystemExit on failure."""
+        try:
+            result = subprocess.run(
+                ['git', 'pull'], capture_output=True, text=True, check=True
+            )
+            Log.info("Git pull completed successfully (headless)")
+        except subprocess.CalledProcessError as e:
+            Log.error(f"Git pull failed (headless): {e.stderr}")
+            sys.exit(f"Error: git pull failed: {e.stderr}")
+
+    @staticmethod
+    def headless_git_commit_and_push(commit_message: str) -> None:
+        """Perform git add, commit, push without prompting. Raises SystemExit on failure."""
+        try:
+            subprocess.run(['git', 'add', '.'], check=True, capture_output=True, text=True)
+
+            result = subprocess.run(
+                ['git', 'diff', '--cached', '--quiet'], capture_output=True
+            )
+            if result.returncode == 0:
+                Log.info("No changes to commit (headless)")
+                return
+
+            subprocess.run(
+                ['git', 'commit', '-m', commit_message],
+                check=True, capture_output=True, text=True
+            )
+            subprocess.run(
+                ['git', 'push'], check=True, capture_output=True, text=True
+            )
+            Log.info("Git commit and push completed (headless)")
+        except subprocess.CalledProcessError as e:
+            Log.error(f"Git operation failed (headless): {e.stderr}")
+            sys.exit(f"Error: git {e.cmd[1]} failed: {e.stderr}")
