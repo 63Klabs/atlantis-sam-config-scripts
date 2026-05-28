@@ -14,7 +14,7 @@ To update your local cli scripts from GitHub repository:
 
 ## v0.0.17 (2026-06-01)
 
-- **config.py**: Added headless skeleton mode for CI/CD automation. Two new non-interactive execution modes:
+- **config.py**: Added headless skeleton mode for AI and CI/CD automation. Two new non-interactive execution modes:
   - `--skeleton` / `--skeleton-verbose`: Generates a pre-populated JSON configuration file in `local-init/` with defaults and (optionally) parameter metadata. Only prompts for template selection.
   - `--headless`: Reads a skeleton file, validates all parameters against template constraints, generates samconfig, performs git operations, and optionally triggers deployment — all without user prompts.
   - `--deploy`: When paired with `--headless`, automatically invokes `deploy.py --headless` after successful configuration.
