@@ -2423,7 +2423,9 @@ class ConfigManager:
                     raise
 
             if version_id:
-                return f"{s3_uri}?versionId={version_id}"
+                # Strip any existing versionId from the URI before appending the new one
+                base_uri = s3_uri.split('?')[0]
+                return f"{base_uri}?versionId={version_id}"
             
             return s3_uri
             
@@ -2739,15 +2741,33 @@ def run_skeleton_mode(args):
         ConsoleAndLog.error(f"Error initializing configuration manager: {str(e)}")
         sys.exit(1)
 
-    # 3. Discover templates and prompt user for selection (only interactive step)
-    templates = config_manager.discover_templates()
-    template_file = FileNameListUtils.select_from_file_list(
-        templates,
-        heading_text="Available templates",
-        prompt_text="Enter a template number"
-    )
-    if template_file.startswith('s3://'):
-        template_file = config_manager.get_latest_version_id(template_file)
+    # 3. Check for existing samconfig to get template_file without prompting
+    local_config = config_manager.read_samconfig()
+    template_file_from_config = None
+    if local_config:
+        template_file_from_config = (
+            local_config.get('atlantis', {})
+            .get('deploy', {})
+            .get('parameters', {})
+            .get('template_file', '')
+        )
+
+    if template_file_from_config:
+        # Use template from existing samconfig — no need to prompt
+        template_file = template_file_from_config
+        if template_file.startswith('s3://'):
+            template_file = config_manager.get_latest_version_id(template_file)
+        click.echo(f"Using template from existing configuration: {template_file}")
+    else:
+        # No existing samconfig — prompt user for template selection (only interactive step)
+        templates = config_manager.discover_templates()
+        template_file = FileNameListUtils.select_from_file_list(
+            templates,
+            heading_text="Available templates",
+            prompt_text="Enter a template number"
+        )
+        if template_file.startswith('s3://'):
+            template_file = config_manager.get_latest_version_id(template_file)
 
     # 4. Get template parameters via get_template_parameters()
     parameter_groups, parameters = config_manager.get_template_parameters(template_file)
@@ -2887,11 +2907,12 @@ def run_headless_mode(args):
         tags, local_config
     )
 
-    # 9. Call save_config()
-    config_manager.save_config(config)
-
-    # 10. Auto-save defaults (equivalent to check_for_default_json with "yes" answers)
+    # 9. Auto-save defaults (equivalent to check_for_default_json with "yes" answers)
+    # Must run before save_config() because save_config mutates parameter_overrides from dict to string
     _headless_auto_save_defaults(config_manager, config)
+
+    # 10. Call save_config()
+    config_manager.save_config(config)
 
     # 11. Delete skeleton file from local-init/
     try:
