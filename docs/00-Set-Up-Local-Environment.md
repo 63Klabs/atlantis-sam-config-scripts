@@ -23,6 +23,16 @@ It is highly recommended you use a Python Virtual Environment for installing and
 
 The project includes a `requirements.txt` file located in the `cli` directory that lists all the Python dependencies needed for the project.
 
+Ensure `venv` is installed.
+
+```bash
+python3 -c "import venv; print('venv is available')"
+
+# If not installed, install it:
+PY_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+sudo apt install python${PY_VERSION}-venv
+```
+
 Create and activate a virtual environment in your repository directory:
 
 ```bash
