@@ -43,9 +43,11 @@ local-init/*
 
 # -- Items above may be adjusted ----------------------------------------------
 
-# Leave this lines
+# Leave these lines
 !sample-*
 !sample.*
 !README.md
 !.gitignore
 !.github
+!.kiro
+!.kiro/**/*.config.kiro

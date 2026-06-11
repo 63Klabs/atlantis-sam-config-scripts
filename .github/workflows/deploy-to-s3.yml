@@ -37,8 +37,8 @@ jobs:
 
       - name: Copy release to S3
         run: |
-          # Create the name of the zip file by taking github.repository from the context removing the owner, and the "atlantis-starter-" from front
-          export ZIP_FILE_NAME=config_cli
+          # Name of File
+          export ZIP_FILE_NAME=sam_config_scripts
           
           # Create a zip of the release - we'll rename it during upload
           zip -r release.zip ./*
