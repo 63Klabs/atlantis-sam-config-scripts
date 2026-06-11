@@ -41,7 +41,7 @@ jobs:
           export ZIP_FILE_NAME=sam_config_scripts
           
           # Create a zip of the release - we'll rename it during upload
-          zip -r release.zip ./*
+          zip -r release.zip cli/* defaults/* docs/* local-templates/* README.md
           
           # Copy to S3
           aws s3 cp release.zip s3://${{ vars.AWS_RELEASE_BUCKET }}${{ vars.AWS_RELEASE_BUCKET_UTILS_PATH }}${ZIP_FILE_NAME}.zip
