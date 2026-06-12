@@ -47,7 +47,7 @@ jobs:
           cp CHANGELOG.md cli/CHANGELOG.md
 
           # Create a zip of the release - we'll rename it during upload
-          zip -r release.zip cli/* defaults/* docs/* README.md AGENTS.md
+          zip -r release.zip cli/* defaults/* docs/* README.md AGENTS.md .gitignore
           
           # Copy to S3
           aws s3 cp release.zip s3://${{ vars.AWS_RELEASE_BUCKET }}${{ vars.AWS_RELEASE_BUCKET_UTILS_PATH }}${ZIP_FILE_NAME}.zip

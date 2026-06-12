@@ -4,6 +4,7 @@
 
 - [ ] If deploy bucket is in param use s3 deploy and vice versa
 - [ ] Repository should be saved as global setting for all env
+- [ ] Don't use default environment in cli command example for single stage samconfigs
 - [ ] Documentation
 
 ## Deploy
