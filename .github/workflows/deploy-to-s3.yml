@@ -40,8 +40,14 @@ jobs:
           # Name of File
           export ZIP_FILE_NAME=sam_config_scripts
           
+          # Rename AGENTS-FOR-END-USE.md to AGENTS.md for the release package
+          cp AGENTS-FOR-END-USE.md AGENTS.md
+
+          # Include CHANGELOG.md inside the cli directory for the release package
+          cp CHANGELOG.md cli/CHANGELOG.md
+
           # Create a zip of the release - we'll rename it during upload
-          zip -r release.zip cli/* defaults/* docs/* local-templates/* README.md
+          zip -r release.zip cli/* defaults/* docs/* README.md AGENTS.md
           
           # Copy to S3
           aws s3 cp release.zip s3://${{ vars.AWS_RELEASE_BUCKET }}${{ vars.AWS_RELEASE_BUCKET_UTILS_PATH }}${ZIP_FILE_NAME}.zip

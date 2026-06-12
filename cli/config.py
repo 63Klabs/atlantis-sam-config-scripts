@@ -129,6 +129,8 @@ class ConfigManager:
                 self.defaults['atlantis']['role_arn'] = self.defaults['atlantis']['StorageServiceRoleArn']
             elif self.infra_type == 'pipeline' and 'PipelineServiceRoleArn' in self.defaults['atlantis']:
                 self.defaults['atlantis']['role_arn'] = self.defaults['atlantis']['PipelineServiceRoleArn']
+            elif self.infra_type == 'network' and 'NetworkServiceRoleArn' in self.defaults['atlantis']:
+                self.defaults['atlantis']['role_arn'] = self.defaults['atlantis']['NetworkServiceRoleArn']
 
     def _validate_args(self) -> None:
         """Validate arguments"""
@@ -462,7 +464,7 @@ class ConfigManager:
             )
 
             # Get role ARN if this is a pipeline deployment
-            if infra_type in ['pipeline', 'storage']:
+            if infra_type in ['pipeline', 'storage', 'network']:
                 atlantis_deploy_params['role_arn'] = get_validated_input(
                     "IAM role ARN for deployments",
                     atlantis_deploy_parameter_defaults.get('role_arn', os.getenv('SAM_DEPLOY_ROLE', '')),
@@ -1030,6 +1032,8 @@ class ConfigManager:
                         default_param = 'StorageServiceRoleArn'
                     elif self.infra_type == 'pipeline':
                         default_param = 'PipelineServiceRoleArn'
+                    elif self.infra_type == 'network':
+                        default_param = 'NetworkServiceRoleArn'
 
                 param_is_not_set = True if "" == default_file_data.get(section_name, {}).get(default_param, "") else False
 
@@ -1199,6 +1203,8 @@ class ConfigManager:
                 atlantis_deploy_params['role_arn'] = atlantis_defaults['StorageServiceRoleArn']
             elif self.infra_type == 'pipeline' and atlantis_defaults.get('PipelineServiceRoleArn'):
                 atlantis_deploy_params['role_arn'] = atlantis_defaults['PipelineServiceRoleArn']
+            elif self.infra_type == 'network' and atlantis_defaults.get('NetworkServiceRoleArn'):
+                atlantis_deploy_params['role_arn'] = atlantis_defaults['NetworkServiceRoleArn']
             elif atlantis_defaults.get('role_arn'):
                 atlantis_deploy_params['role_arn'] = atlantis_defaults['role_arn']
 
@@ -1223,8 +1229,8 @@ class ConfigManager:
             'confirm_changeset': atlantis_deploy_params['confirm_changeset'],
         }
 
-        # Add role_arn only for pipeline and storage infra types
-        if self.infra_type in ['pipeline', 'storage'] and atlantis_deploy_params.get('role_arn'):
+        # Add role_arn only for pipeline, storage, and network infra types
+        if self.infra_type in ['pipeline', 'storage', 'network'] and atlantis_deploy_params.get('role_arn'):
             atlantis_section['role_arn'] = atlantis_deploy_params['role_arn']
 
         # --- Build parameter_overrides ---
@@ -1939,6 +1945,10 @@ class ConfigManager:
             'confirm_changeset': (atlantis_deploy_params['confirm_changeset'].lower() == 'true')
         }
 
+        # Add role_arn for pipeline/storage/network deployments so it propagates to all environments
+        if infra_type in ['pipeline', 'storage', 'network']:
+            atlantis_default_deploy_parameters['role_arn'] = atlantis_deploy_params['role_arn']
+
         # If deployments has more than one key then inform the user that multiple deployments were detected, 
         # would they like to update the atlantis deployment parameters across all?
         if len(deployments) > 1:
@@ -1990,11 +2000,7 @@ class ConfigManager:
             },
             'deployments': deployments
         }
-        
-        # Add role_arn if this is a pipeline or storage deployment
-        if infra_type in ['pipeline', 'storage']:
-            config['atlantis']['deploy']['parameters']['role_arn'] = atlantis_deploy_params['role_arn']
-        
+
         return config
 
     def build_config_headless(self, infra_type: str, template_file: str,
@@ -2056,6 +2062,10 @@ class ConfigManager:
             'confirm_changeset': confirm_changeset_bool
         }
 
+        # Add role_arn for pipeline/storage/network deployments so it propagates to all environments
+        if infra_type in ['pipeline', 'storage', 'network']:
+            atlantis_default_deploy_parameters['role_arn'] = atlantis_params.get('role_arn', '')
+
         # Build deployment parameters for the current stage
         deployment_parameters = atlantis_default_deploy_parameters.copy()
         deployment_parameters.update({
@@ -2080,10 +2090,6 @@ class ConfigManager:
             },
             'deployments': deployments
         }
-
-        # Add role_arn if this is a pipeline or storage deployment
-        if infra_type in ['pipeline', 'storage']:
-            config['atlantis']['deploy']['parameters']['role_arn'] = atlantis_params.get('role_arn', '')
 
         return config
 
