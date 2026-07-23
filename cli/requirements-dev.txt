@@ -1,0 +1,10 @@
+# Local development tooling for maintainers of this repository.
+# Install cli/requirements.txt and cli/requirements-test.txt first, then this file:
+#   pip install -r cli/requirements.txt
+#   pip install -r cli/requirements-test.txt
+#   pip install -r cli/requirements-dev.txt
+#
+# These packages are NOT shipped to end users and are not required to run tests.
+
+# Static type checking
+mypy>=1.5.1

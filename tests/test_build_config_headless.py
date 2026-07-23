@@ -153,20 +153,27 @@ class TestBuildConfigHeadless:
 
         assert config['atlantis']['deploy']['parameters']['role_arn'] == 'arn:aws:iam::123456789012:role/storage-role'
 
-    def test_role_arn_not_included_for_network(self):
-        """role_arn is NOT included in atlantis params for network infra_type."""
+    def test_role_arn_included_for_network(self):
+        """role_arn is included in atlantis params for network infra_type.
+
+        Supersedes the former test_role_arn_not_included_for_network, which
+        asserted the pre-fix behavior where network was excluded from role_arn
+        propagation. Requirement 3.5 (prior v0.0.18 fix) makes network propagate
+        role_arn to deploy.parameters just like pipeline and storage.
+        """
         cm = _create_config_manager(infra_type='network')
 
         atlantis_params = {
             's3_bucket': 'bucket',
             'region': 'us-east-1',
             'confirm_changeset': 'true',
+            'role_arn': 'arn:aws:iam::123456789012:role/network-role'
         }
         parameter_values = {'Prefix': 'acme', 'ProjectId': 'myapp', 'StageId': 'dev'}
 
         config = cm.build_config_headless('network', 's3://bucket/template.yml', atlantis_params, parameter_values, [], {})
 
-        assert 'role_arn' not in config['atlantis']['deploy']['parameters']
+        assert config['atlantis']['deploy']['parameters']['role_arn'] == 'arn:aws:iam::123456789012:role/network-role'
 
     def test_stack_name_generation(self):
         """Stack name is generated using get_stack_name() logic (prefix-project-stage-infra)."""

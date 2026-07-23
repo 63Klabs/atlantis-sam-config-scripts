@@ -123,14 +123,46 @@ class ConfigManager:
         self.settings = config_loader.load_settings()
         self.defaults = config_loader.load_defaults()
 
-        # if role_arn is not in self.defaults, then check for StorageServiceRole
-        if 'role_arn' not in self.defaults['atlantis']:
-            if self.infra_type == 'storage' and 'StorageServiceRoleArn' in self.defaults['atlantis']:
-                self.defaults['atlantis']['role_arn'] = self.defaults['atlantis']['StorageServiceRoleArn']
-            elif self.infra_type == 'pipeline' and 'PipelineServiceRoleArn' in self.defaults['atlantis']:
-                self.defaults['atlantis']['role_arn'] = self.defaults['atlantis']['PipelineServiceRoleArn']
-            elif self.infra_type == 'network' and 'NetworkServiceRoleArn' in self.defaults['atlantis']:
-                self.defaults['atlantis']['role_arn'] = self.defaults['atlantis']['NetworkServiceRoleArn']
+    def resolve_role_arn(self, atlantis_defaults: Dict, samconfig_role_arn: Optional[str] = None) -> str:
+        """Resolve the deploy role_arn using authoritative precedence.
+
+        Precedence (highest to lowest):
+            1. An existing samconfig role_arn (samconfig_role_arn), if non-empty.
+            2. The infra-specific service role ARN for self.infra_type
+               (PipelineServiceRoleArn / StorageServiceRoleArn / NetworkServiceRoleArn).
+            3. The generic role_arn from defaults (fallback only).
+
+        This helper never mutates atlantis_defaults; resolution occurs at the
+        point of use so a generic role_arn is only ever read from a defaults
+        file, never injected into the defaults dictionary.
+
+        Args:
+            atlantis_defaults (dict): The 'atlantis' section of the loaded defaults.
+            samconfig_role_arn (str, optional): role_arn already present in an existing
+                samconfig. Defaults to None.
+
+        Returns:
+            str: The resolved role ARN, or '' if none is available.
+
+        Example:
+            >>> manager.infra_type = 'storage'
+            >>> manager.resolve_role_arn({'StorageServiceRoleArn': 'arn:...:Storage',
+            ...                           'role_arn': 'arn:...:Pipeline'})
+            'arn:...:Storage'
+        """
+        if samconfig_role_arn:
+            return samconfig_role_arn
+
+        infra_key = {
+            'pipeline': 'PipelineServiceRoleArn',
+            'storage': 'StorageServiceRoleArn',
+            'network': 'NetworkServiceRoleArn',
+        }.get(self.infra_type)
+
+        if infra_key and atlantis_defaults.get(infra_key):
+            return atlantis_defaults[infra_key]
+
+        return atlantis_defaults.get('role_arn', '')
 
     def _validate_args(self) -> None:
         """Validate arguments"""
@@ -1197,16 +1229,13 @@ class ConfigManager:
             if 'confirm_changeset' in samconfig_atlantis:
                 atlantis_deploy_params['confirm_changeset'] = samconfig_atlantis['confirm_changeset']
 
-        # Set role_arn from defaults if not already set from samconfig
-        if 'role_arn' not in atlantis_deploy_params:
-            if self.infra_type == 'storage' and atlantis_defaults.get('StorageServiceRoleArn'):
-                atlantis_deploy_params['role_arn'] = atlantis_defaults['StorageServiceRoleArn']
-            elif self.infra_type == 'pipeline' and atlantis_defaults.get('PipelineServiceRoleArn'):
-                atlantis_deploy_params['role_arn'] = atlantis_defaults['PipelineServiceRoleArn']
-            elif self.infra_type == 'network' and atlantis_defaults.get('NetworkServiceRoleArn'):
-                atlantis_deploy_params['role_arn'] = atlantis_defaults['NetworkServiceRoleArn']
-            elif atlantis_defaults.get('role_arn'):
-                atlantis_deploy_params['role_arn'] = atlantis_defaults['role_arn']
+        # Resolve role_arn with authoritative precedence (samconfig -> infra-specific -> generic)
+        resolved = self.resolve_role_arn(
+            atlantis_defaults,
+            samconfig_role_arn=atlantis_deploy_params.get('role_arn')
+        )
+        if resolved:
+            atlantis_deploy_params['role_arn'] = resolved
 
         # Store template_file: full S3 URI with versionId for S3, filename only for local
         if template_file.startswith('s3://'):
@@ -3133,6 +3162,12 @@ def main():
         click.echo(Colorize.info("Enter to accept default, ? for help, - to clear, ^ to exit "))
 
         atlantis_deploy_parameter_defaults = defaults.get('atlantis', {})
+        # Resolve role_arn with correct precedence for the prompt default (fallback aware),
+        # without mutating the loaded defaults.
+        resolved_role_arn = config_manager.resolve_role_arn(defaults.get('atlantis', {}))
+        if resolved_role_arn:
+            atlantis_deploy_parameter_defaults = {**atlantis_deploy_parameter_defaults,
+                                                  'role_arn': resolved_role_arn}
         if local_config:
             atlantis_deploy_parameter_defaults.update(local_config.get('atlantis', {}).get('deploy', {}).get('parameters', {}))
 

@@ -1,0 +1,14 @@
+# Test dependencies for the Atlantis SAM config scripts.
+# Install cli/requirements.txt first, then this file:
+#   pip install -r cli/requirements.txt
+#   pip install -r cli/requirements-test.txt
+#
+# These packages are NOT shipped to end users; they are only needed to run
+# the test suite locally or in CI/CD.
+
+# Test runner and coverage
+pytest>=7.4.0
+pytest-cov>=4.1.0
+
+# Property-based testing
+hypothesis>=6.100.0

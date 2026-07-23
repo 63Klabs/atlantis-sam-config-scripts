@@ -1,7 +1,8 @@
-# pip install -r requirements.txt
-
-# For development environments:
-# pip install -e ".[dev]"
+# Runtime dependencies for the cli/ scripts (shipped to end users).
+#   pip install -r cli/requirements.txt
+#
+# Test and dev tooling live in cli/requirements-test.txt and
+# cli/requirements-dev.txt and are NOT installed by end users.
 
 # AWS SDK and CLI tools
 boto3>=1.28.0
@@ -16,8 +17,3 @@ click>=8.1.0
 
 # Type hints support
 typing-extensions>=4.7.1
-
-# Development and testing
-pytest>=7.4.0
-pytest-cov>=4.1.0
-mypy>=1.5.1

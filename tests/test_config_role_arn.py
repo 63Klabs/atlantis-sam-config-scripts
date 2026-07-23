@@ -573,3 +573,275 @@ class TestFutureDefaultsPersistence:
         assert 'PipelineServiceRoleArn' not in result_data['atlantis'], (
             "Network role_arn should not be saved under PipelineServiceRoleArn"
         )
+
+
+# ---------------------------------------------------------------------------
+# Bug Condition Exploration Test - role_arn precedence inversion (Task 1)
+# ---------------------------------------------------------------------------
+
+# Mapping of infra_type -> the infra-specific persisted default key it should resolve.
+INFRA_SPECIFIC_KEY = {
+    'pipeline': 'PipelineServiceRoleArn',
+    'storage': 'StorageServiceRoleArn',
+    'network': 'NetworkServiceRoleArn',
+}
+
+
+def _resolve_role_arn_via_manager(config_manager, atlantis_defaults, samconfig_role_arn=None):
+    """Resolve role_arn through the authoritative helper when it exists.
+
+    The fix (a later task) introduces ``ConfigManager.resolve_role_arn()`` with
+    the precedence: existing samconfig ``role_arn`` -> infra-specific
+    ``*ServiceRoleArn`` -> generic ``role_arn`` fallback. When that method is
+    present this delegates to it directly.
+
+    On UNFIXED code the helper does not exist yet, so this mirrors the current
+    constructor / ``generate_skeleton`` precedence (in which a generic
+    ``role_arn`` present in defaults suppresses the infra-specific override).
+    Mirroring keeps the exploration test runnable and makes the assertion FAIL
+    for the right reason — the generic value winning — instead of erroring on a
+    missing attribute.
+
+    Args:
+        config_manager (ConfigManager): Manager whose ``infra_type`` drives the
+            infra-specific key selection.
+        atlantis_defaults (dict): The 'atlantis' section of the loaded defaults.
+        samconfig_role_arn (str, optional): role_arn already present in an
+            existing samconfig. Defaults to None.
+
+    Returns:
+        str: The resolved role ARN, or '' if none is available.
+    """
+    if hasattr(config_manager, 'resolve_role_arn'):
+        return config_manager.resolve_role_arn(
+            atlantis_defaults, samconfig_role_arn=samconfig_role_arn
+        )
+
+    # --- Mirror of the current (unfixed) precedence ---
+    if samconfig_role_arn:
+        return samconfig_role_arn
+    defaults_copy = dict(atlantis_defaults)  # never mutate the caller's dict
+    if 'role_arn' not in defaults_copy:
+        infra_key = INFRA_SPECIFIC_KEY.get(config_manager.infra_type)
+        if infra_key and infra_key in defaults_copy:
+            return defaults_copy[infra_key]
+    return defaults_copy.get('role_arn', '')
+
+
+class TestRoleArnBugConditionPrecedence:
+    """Property 1: Bug Condition - infra-specific role ARN wins over generic role_arn.
+
+    **Validates: Requirements 1.1, 1.2, 1.3**
+
+    The bug: the ConfigManager constructor only maps the infra-specific
+    ``*ServiceRoleArn`` into ``role_arn`` when a generic ``role_arn`` is NOT
+    already present (guard ``if 'role_arn' not in self.defaults['atlantis']``).
+    When a defaults file contains BOTH a generic ``role_arn`` and the matching
+    infra-specific key, the guard is False and the infra-specific override never
+    runs, so storage/network stacks inherit the generic (pipeline) role.
+
+    This test encodes the EXPECTED behavior (infra-specific value wins). On
+    unfixed code it FAILS for storage/network/pipeline where the two values
+    differ, confirming the precedence inversion. After the fix introduces
+    ``resolve_role_arn()`` the same test PASSES.
+    """
+
+    @given(
+        infra_type=bug_condition_infra_type,
+        generic_role_arn=role_arn_strategy,
+        infra_specific_role_arn=role_arn_strategy,
+    )
+    @settings(max_examples=50)
+    def test_bug_condition_precedence_both_present(
+        self, infra_type, generic_role_arn, infra_specific_role_arn
+    ):
+        """When both a generic role_arn and the matching infra-specific key are
+        present (and no samconfig override), resolution must return the
+        infra-specific ``*ServiceRoleArn`` value.
+
+        On unfixed code the generic value wins, so this FAILS — surfacing the
+        precedence inversion counterexample.
+
+        **Validates: Requirements 1.1, 1.2, 1.3**
+        """
+        # The generic value must differ from the infra-specific one to expose
+        # the inversion (matching the design's isBugCondition).
+        assume(generic_role_arn != infra_specific_role_arn)
+
+        cm = _create_config_manager(
+            prefix='acme', project_id='myapp',
+            stage_id='dev', infra_type=infra_type
+        )
+        infra_key = INFRA_SPECIFIC_KEY[infra_type]
+
+        atlantis_defaults = {
+            # Generic fallback (e.g., equal to the pipeline ARN in real files).
+            'role_arn': generic_role_arn,
+            # Matching infra-specific key that SHOULD win.
+            infra_key: infra_specific_role_arn,
+        }
+
+        resolved = _resolve_role_arn_via_manager(
+            cm, atlantis_defaults, samconfig_role_arn=None
+        )
+
+        assert resolved == atlantis_defaults[infra_key], (
+            f"infra_type='{infra_type}': resolution returned the generic "
+            f"role_arn '{resolved}' instead of the infra-specific {infra_key} "
+            f"'{atlantis_defaults[infra_key]}'. Precedence inversion confirmed."
+        )
+
+
+# ---------------------------------------------------------------------------
+# Preservation Property Tests - resolution precedence (Task 2)
+# ---------------------------------------------------------------------------
+
+
+class TestRoleArnPreservationResolution:
+    """Property 2: Preservation - fallback, samconfig precedence, service-role
+    fallthrough, and non-injection remain unchanged.
+
+    **Validates: Requirements 3.1, 3.2, 3.3, 3.4**
+
+    These tests observe the CURRENT correct behavior on unfixed code (via the
+    ``_resolve_role_arn_via_manager`` bridge, which mirrors the current
+    precedence for non-bug inputs) and encode it so it continues to hold after
+    the fix introduces ``ConfigManager.resolve_role_arn()``. Every case here is
+    a non-bug input (isBugCondition is False), so resolution must be identical
+    before and after the fix.
+    """
+
+    @given(
+        infra_type=bug_condition_infra_type,
+        generic_role_arn=role_arn_strategy,
+    )
+    @settings(max_examples=50)
+    def test_preservation_generic_only(self, infra_type, generic_role_arn):
+        """Generic-only defaults (no infra-specific key) resolve to the generic
+        ``role_arn`` fallback.
+
+        **Validates: Requirements 3.1**
+        """
+        cm = _create_config_manager(
+            prefix='acme', project_id='myapp',
+            stage_id='dev', infra_type=infra_type
+        )
+
+        # Only the generic fallback is present; the matching *ServiceRoleArn is
+        # deliberately absent so resolution must fall through to role_arn.
+        atlantis_defaults = {
+            'role_arn': generic_role_arn,
+        }
+
+        resolved = _resolve_role_arn_via_manager(
+            cm, atlantis_defaults, samconfig_role_arn=None
+        )
+
+        assert resolved == generic_role_arn, (
+            f"infra_type='{infra_type}': generic-only defaults should resolve "
+            f"to the generic role_arn '{generic_role_arn}', got '{resolved}'."
+        )
+
+    @given(
+        infra_type=bug_condition_infra_type,
+        infra_specific_role_arn=role_arn_strategy,
+    )
+    @settings(max_examples=50)
+    def test_preservation_infra_specific_only(
+        self, infra_type, infra_specific_role_arn
+    ):
+        """Infra-specific-only defaults (no generic ``role_arn``) resolve to the
+        matching ``*ServiceRoleArn`` value.
+
+        **Validates: Requirements 3.2**
+        """
+        cm = _create_config_manager(
+            prefix='acme', project_id='myapp',
+            stage_id='dev', infra_type=infra_type
+        )
+        infra_key = INFRA_SPECIFIC_KEY[infra_type]
+
+        # Only the matching infra-specific key is present; no generic role_arn.
+        atlantis_defaults = {
+            infra_key: infra_specific_role_arn,
+        }
+
+        resolved = _resolve_role_arn_via_manager(
+            cm, atlantis_defaults, samconfig_role_arn=None
+        )
+
+        assert resolved == infra_specific_role_arn, (
+            f"infra_type='{infra_type}': infra-specific-only defaults should "
+            f"resolve to {infra_key} '{infra_specific_role_arn}', "
+            f"got '{resolved}'."
+        )
+
+    @given(
+        infra_type=bug_condition_infra_type,
+        samconfig_role_arn=role_arn_strategy,
+        generic_role_arn=role_arn_strategy,
+        infra_specific_role_arn=role_arn_strategy,
+    )
+    @settings(max_examples=50)
+    def test_preservation_samconfig_precedence(
+        self, infra_type, samconfig_role_arn,
+        generic_role_arn, infra_specific_role_arn
+    ):
+        """An existing samconfig ``role_arn`` takes highest precedence over any
+        defaults values.
+
+        **Validates: Requirements 3.3**
+        """
+        # The samconfig value must differ from both defaults to prove it wins.
+        assume(samconfig_role_arn != generic_role_arn)
+        assume(samconfig_role_arn != infra_specific_role_arn)
+
+        cm = _create_config_manager(
+            prefix='acme', project_id='myapp',
+            stage_id='dev', infra_type=infra_type
+        )
+        infra_key = INFRA_SPECIFIC_KEY[infra_type]
+
+        atlantis_defaults = {
+            'role_arn': generic_role_arn,
+            infra_key: infra_specific_role_arn,
+        }
+
+        resolved = _resolve_role_arn_via_manager(
+            cm, atlantis_defaults, samconfig_role_arn=samconfig_role_arn
+        )
+
+        assert resolved == samconfig_role_arn, (
+            f"infra_type='{infra_type}': an existing samconfig role_arn "
+            f"'{samconfig_role_arn}' must win over defaults, got '{resolved}'."
+        )
+
+    @given(
+        generic_role_arn=role_arn_strategy,
+    )
+    @settings(max_examples=50)
+    def test_preservation_service_role_fallthrough(self, generic_role_arn):
+        """The ``service-role`` infra type has no infra-specific key and falls
+        through to the generic ``role_arn``.
+
+        **Validates: Requirements 3.4**
+        """
+        cm = _create_config_manager(
+            prefix='acme', project_id='myapp',
+            stage_id='dev', infra_type='service-role'
+        )
+
+        # service-role has no matching *ServiceRoleArn key; only the generic
+        # fallback is available.
+        atlantis_defaults = {
+            'role_arn': generic_role_arn,
+        }
+
+        resolved = _resolve_role_arn_via_manager(
+            cm, atlantis_defaults, samconfig_role_arn=None
+        )
+
+        assert resolved == generic_role_arn, (
+            f"service-role should fall through to the generic role_arn "
+            f"'{generic_role_arn}', got '{resolved}'."
+        )

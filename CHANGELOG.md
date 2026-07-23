@@ -28,6 +28,10 @@ To update your local cli scripts from GitHub repository:
   - `role_arn` now included in `atlantis_default_deploy_parameters` for `pipeline` and `storage` infra types
   - Propagates correctly to all deployment environments in both `build_config()` and `build_config_headless()`
   - Eliminates redundant top-level `role_arn` entry in `config['atlantis']['deploy']['parameters']`
+- **Script: config.py** - Fixed `role_arn` precedence so infra-specific `*ServiceRoleArn` defaults override a generic `role_arn` fallback [Spec: 0-0-18-role_arn-further-fix](.kiro/specs/0-0-18-role_arn-further-fix/), addresses [#3](https://github.com/63Klabs/atlantis-sam-config-scripts/issues/3)
+  - infra-specific key now wins over generic `role_arn` for pipeline/storage/network
+  - generic `role_arn` is a read-only fallback and is no longer injected into defaults
+  - interactive and headless paths consolidated onto a single `resolve_role_arn()` helper
 
 ## v0.0.17 (2026-06-01)
 
