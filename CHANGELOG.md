@@ -7,14 +7,18 @@ To update your local cli scripts from GitHub repository:
 ```
 
 - The scripts are still in BETA and features are still being added and tested.
-- There may be several versions with small fixes released every so often until reaching v0.1.0.
-- After v0.1.0 all v0.0.x version change information will be removed from the Changelog.
-- Refer to [TODO](./TODO.md) for upcoming BETA fixes and features.
-- Report any issues not covered in TODO via the [Issues page in the GitHub repository](https://github.com/63Klabs/atlantis-sam-config-scripts/issues)
+- Report any issues or requests via the [Issues page in the GitHub repository](https://github.com/63Klabs/atlantis-sam-config-scripts/issues)
 
 ## v0.0.18 (unreleased)
 
 ### Added
+- **Automatic dev-to-test Merge on Repository Creation** [Spec: 0-0-18-create-repo-auto-merge-test-branch](.kiro/specs/0-0-18-create-repo-auto-merge-test-branch/)
+  - **Script: create_repo.py v0.2.0** - When a repository is seeded (via `--source` or a selected application starter), the seeded `dev` branch is now automatically merged into `test` so a test pipeline can be created immediately
+  - Added `--skip-test-merge` opt-out flag to leave `test` unchanged; the merge only occurs when the repository is seeded
+  - CodeCommit uses a server-side fast-forward merge; GitHub reuses the existing seed clone (no additional clone) and cleans it up afterward
+  - Merge failures are non-fatal: the repository and its `dev` branch are preserved, and manual merge instructions are printed
+  - On a successful merge, prints a follow-up hint for creating the test pipeline
+  - **Library: gh_utils.py v0.1.0** - Added `GitHubUtils.merge_branches_fast_forward()` for fast-forward merging branches in a local clone
 - **Script: config.py** - Extended `role_arn` support to `network` infrastructure type [Spec: 0-0-18-network-role-arn-support](.kiro/specs/0-0-18-network-role-arn-support/)
   - Network deployments now prompt for Role ARN during interactive configuration
   - Role ARN propagates to all environments in both `build_config()` and `build_config_headless()`

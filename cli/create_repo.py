@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-VERSION = "v0.1.4/2025-06-04"
+VERSION = "v0.2.0/2026-07-24"
 # Created by Chad Kluck with AI assistance from Amazon Q Developer
 # GitHub Copilot assisted with GitHub operations and color formats of output and prompts
 
@@ -42,15 +42,55 @@ ScriptLogger.setup('create_repo')
 SETTINGS_DIR = "defaults"
 VALID_PROVIDERS = ['codecommit', 'github']
 
+
+def should_merge_test(source: Optional[str], skip_test_merge: bool) -> bool:
+    """Decide whether the dev->test merge should be attempted.
+
+    Pure, side-effect-free predicate encoding the gating rule used by
+    ``RepositoryCreator.create_and_seed_repository``: the merge is attempted
+    only when a Source was resolved (truthy) AND the opt-out flag is not set.
+    When no Source is resolved, no merge is attempted regardless of the flag.
+
+    Args:
+        source (Optional[str]): The resolved seed source (e.g. an S3 or
+            GitHub URI). Falsy values (``None`` or empty string) mean no
+            Source was resolved.
+        skip_test_merge (bool): The ``--skip-test-merge`` opt-out flag. When
+            ``True`` the merge is suppressed.
+
+    Returns:
+        bool: ``True`` if and only if ``source`` is truthy and
+            ``skip_test_merge`` is ``False``; otherwise ``False``.
+
+    Example:
+        >>> should_merge_test("s3://bucket/app.zip", False)
+        True
+        >>> should_merge_test("s3://bucket/app.zip", True)
+        False
+        >>> should_merge_test(None, False)
+        False
+        >>> should_merge_test("", False)
+        False
+    """
+    return bool(source) and not skip_test_merge
+
+
 class RepositoryCreator:
 
-    def __init__(self, repo_name: str, source: Optional[str] = None, region:  Optional[str] = None, profile: Optional[str] = None, prefix: Optional[str] = None, provider: Optional[str] = None, no_browser: Optional[bool] = False) -> None:
+    def __init__(self, repo_name: str, source: Optional[str] = None, region:  Optional[str] = None, profile: Optional[str] = None, prefix: Optional[str] = None, provider: Optional[str] = None, no_browser: Optional[bool] = False, skip_test_merge: Optional[bool] = False) -> None:
         self.repo_name = repo_name
         self.region = region
         self.profile = profile
         self.prefix = prefix
         self.provider = provider
         self.tags = {}
+
+        # Opt-out flag from --skip-test-merge; when True the dev->test merge is skipped
+        self.skip_test_merge = skip_test_merge
+        # Reused local clone from GitHub seeding (None for CodeCommit)
+        self._github_clone_dir = None
+        # Set True only after a successful dev->test merge; gates the follow-up hint
+        self.test_branch_updated = False
 
         self.source_type = None
         self.source = None
@@ -188,6 +228,15 @@ class RepositoryCreator:
             
             # Seed repository with initial commit
             self._seed_repository(temp_dir)
+            
+            # After seeding, merge dev -> test so a test pipeline can be created immediately
+            try:
+                if self.skip_test_merge:
+                    self._skip_test_merge_notice()
+                else:
+                    self._merge_dev_to_test()
+            finally:
+                self._cleanup_github_clone()
 
 
     def _create_repository(self):
@@ -208,6 +257,85 @@ class RepositoryCreator:
             self._seed_repository_codecommit(temp_dir)
         elif self.provider == 'github':
             self._seed_repository_github(temp_dir)
+
+    def _merge_dev_to_test(self):
+        """Merge the seeded 'dev' branch into 'test' (best-effort, non-fatal)."""
+        if self.provider == 'codecommit':
+            self._merge_dev_to_test_codecommit()
+        elif self.provider == 'github':
+            self._merge_dev_to_test_github()
+
+    def _merge_dev_to_test_codecommit(self):
+        """Fast-forward merge the 'dev' branch into 'test' on CodeCommit.
+
+        Performs a server-side fast-forward merge so no local clone is
+        required. On success, sets ``self.test_branch_updated`` to ``True``
+        so the follow-up hint can be displayed. Any error is treated as a
+        non-fatal merge failure and routed to ``_handle_merge_failure`` (the
+        repository and its seeded 'dev' branch are left intact).
+
+        Raises:
+            None: Exceptions from the CodeCommit merge operation are caught
+                and handled non-fatally via ``_handle_merge_failure``.
+
+        Example:
+            >>> creator._merge_dev_to_test_codecommit()
+        """
+        try:
+            click.echo(Colorize.output("Merging dev into test (fast-forward)"))
+            Log.info("Merging dev into test on CodeCommit via fast-forward")
+
+            self.codecommit_client.merge_branches_by_fast_forward(
+                repositoryName=self.repo_name,
+                sourceCommitSpecifier='dev',
+                destinationCommitSpecifier='test',
+                targetBranch='test'
+            )
+
+            self.test_branch_updated = True
+            click.echo(Colorize.success("Successfully merged dev into test"))
+            Log.info("Successfully merged dev into test")
+        except Exception as e:
+            self._handle_merge_failure(e)
+
+    def _merge_dev_to_test_github(self):
+        """Fast-forward merge the 'dev' branch into 'test' on GitHub.
+
+        Reuses the local clone created during GitHub seeding
+        (``self._github_clone_dir``) rather than creating an additional
+        clone, so the merge inherits the branches and commit author identity
+        already configured on that clone. On success, sets
+        ``self.test_branch_updated`` to ``True`` so the follow-up hint can be
+        displayed. Any error (including a missing or invalid seed clone
+        directory) is treated as a non-fatal merge failure and routed to
+        ``_handle_merge_failure`` (the repository and its seeded 'dev' branch
+        are left intact).
+
+        Raises:
+            None: Exceptions from the GitHub merge operation are caught and
+                handled non-fatally via ``_handle_merge_failure``.
+
+        Example:
+            >>> creator._merge_dev_to_test_github()
+        """
+        try:
+            click.echo(Colorize.output("Merging dev into test (fast-forward)"))
+            Log.info("Merging dev into test on GitHub via fast-forward")
+
+            if not self._github_clone_dir or not os.path.isdir(self._github_clone_dir):
+                raise RuntimeError("Seed clone directory is unavailable for merge")
+
+            GitHubUtils.merge_branches_fast_forward(
+                self._github_clone_dir,
+                source_branch='dev',
+                dest_branch='test'
+            )
+
+            self.test_branch_updated = True
+            click.echo(Colorize.success("Successfully merged dev into test"))
+            Log.info("Successfully merged dev into test")
+        except Exception as e:
+            self._handle_merge_failure(e)
 
     def _create_repository_codecommit(self):
         try:
@@ -655,8 +783,9 @@ class RepositoryCreator:
             click.echo(Colorize.output(f"Seeding repository with {total_files} files"))
             Log.info(f"Creating initial commit with {total_files} files")
 
-            # Create a temporary directory for git operations
+            # Create a temporary directory for git operations and retain it for the merge step
             git_dir = tempfile.mkdtemp()
+            self._github_clone_dir = git_dir
 
             GitHubUtils.create_init_commit(all_files, self.repo_name, seed_branch, self.get_init_commit_author(), self.get_init_commit_email(), git_dir)
 
@@ -672,6 +801,150 @@ class RepositoryCreator:
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
 
+
+    def _build_manual_merge_instructions(self) -> List[str]:
+        """Build the manual dev-to-test merge command lines.
+
+        Produces the list of git commands a developer can run to merge the
+        seeded ``dev`` branch into ``test`` by hand. This is shown when the
+        automatic merge is skipped or fails. The HTTPS clone URL is used when
+        it can be resolved; otherwise the repository name is used as a fallback.
+
+        Returns:
+            List[str]: Ordered git command strings that clone the repository,
+                check out ``test``, merge ``dev``, and push ``test`` to origin.
+
+        Example:
+            >>> creator._build_manual_merge_instructions()
+            ['git clone https://example.com/my-repo', 'git checkout test',
+             'git merge dev', 'git push origin test']
+        """
+        try:
+            clone_url = self.get_clone_urls().get('https', '') or self.repo_name
+        except Exception:
+            clone_url = self.repo_name
+
+        return [
+            f"git clone {clone_url}",
+            "git checkout test",
+            "git merge dev",
+            "git push origin test",
+        ]
+
+
+    def _handle_merge_failure(self, error: Exception) -> None:
+        """Handle a failed dev-to-test merge as a non-fatal, best-effort event.
+
+        The repository and its seeded ``dev`` branch already exist and are
+        valuable, so a merge failure must never undo them. This handler records
+        the failure via ``Log``, surfaces a warning via ``Colorize``, and prints
+        the manual merge instructions so the developer can complete the merge by
+        hand. It never deletes the repository and never exits the process.
+
+        Because the merge did not succeed, ``self.test_branch_updated`` is set to
+        ``False`` so the follow-up test-pipeline hint is suppressed.
+
+        Args:
+            error (Exception): The exception raised by the provider merge
+                operation. Its message is logged for troubleshooting.
+
+        Example:
+            >>> try:
+            ...     creator._merge_dev_to_test()
+            ... except Exception as e:
+            ...     creator._handle_merge_failure(e)
+        """
+        self.test_branch_updated = False
+        Log.warning(f"Could not merge dev into test: {str(error)}")
+        click.echo(Colorize.warning(
+            "Could not automatically merge dev into test. "
+            "The repository and its dev branch are intact."))
+        click.echo(Colorize.output("To merge dev into test manually:"))
+        for line in self._build_manual_merge_instructions():
+            click.echo(Colorize.output(f"    {line}"))
+
+
+    def _skip_test_merge_notice(self) -> None:
+        """Inform the user the dev-to-test merge was skipped and how to do it later.
+
+        Called when the ``--skip-test-merge`` flag is set. The repository and its
+        seeded ``dev`` branch exist, but ``test`` was intentionally left unchanged.
+        This records the skip via ``Log`` and surfaces an informational message via
+        ``Colorize`` explaining that the merge was skipped, followed by the manual
+        merge instructions so the developer can perform the merge later. It does
+        not prompt for input and does not affect ``self.test_branch_updated``.
+
+        Example:
+            >>> creator.skip_test_merge = True
+            >>> creator._skip_test_merge_notice()
+        """
+        Log.info("Skipping dev->test merge due to --skip-test-merge flag")
+        click.echo(Colorize.output("Skipping merge of dev into test (--skip-test-merge)."))
+        click.echo(Colorize.output("To merge dev into test later:"))
+        for line in self._build_manual_merge_instructions():
+            click.echo(Colorize.output(f"    {line}"))
+
+
+    def _cleanup_github_clone(self) -> None:
+        """Remove the reused GitHub seed clone directory, if any.
+
+        GitHub seeding creates a temporary local clone that is retained on
+        ``self._github_clone_dir`` so the dev-to-test merge can reuse it. This
+        method removes that directory once the merge/skip decision is complete
+        and resets the attribute so it is not reused or cleaned up twice. It is
+        called from a ``finally`` block so it runs on every path (merge success,
+        skip, or unexpected error).
+
+        For the CodeCommit provider, no local clone is created, so
+        ``self._github_clone_dir`` remains ``None`` and this method is a no-op.
+
+        Example:
+            >>> creator._github_clone_dir = "/tmp/seed-clone"
+            >>> creator._cleanup_github_clone()
+            >>> creator._github_clone_dir is None
+            True
+        """
+        if self._github_clone_dir:
+            shutil.rmtree(self._github_clone_dir, ignore_errors=True)
+            self._github_clone_dir = None
+
+
+    def build_test_pipeline_hint(self) -> List[str]:
+        """Build the follow-up hint lines guiding test pipeline creation.
+
+        Produces the informational (non-interactive) hint shown after a
+        successful dev-to-test merge. The suggested command keeps ``<prefix>``
+        and ``<project_id>`` as literal placeholders (the prefix is not known
+        at creation time and a descriptive ``repo_name`` may exceed the
+        ``project_id`` character limit) while ``test`` is the literal, known
+        stage id. When a ``--profile`` value was provided to ``create_repo.py``,
+        ``--profile <profile>`` is appended to the command using the actual
+        profile value; otherwise the option is omitted. A separate line
+        instructs the developer to use the actual ``repo_name`` for the
+        Repository parameter.
+
+        Returns:
+            List[str]: Ordered, styled hint lines ready to be echoed. The list
+                contains the heading, a "Run:" label, the suggested command,
+                and the Repository-parameter instruction.
+
+        Example:
+            >>> creator.profile = 'acme'
+            >>> creator.repo_name = 'acme-web-app'
+            >>> lines = creator.build_test_pipeline_hint()
+            >>> len(lines)
+            4
+        """
+        command = "./cli/config.py pipeline <prefix> <project_id> test"
+        if self.profile:
+            command += f" --profile {self.profile}"
+
+        return [
+            Colorize.output_bold("Next step: create the test pipeline"),
+            Colorize.output("Run:"),
+            Colorize.output_with_value("   ", command),
+            Colorize.output(f"Use {self.repo_name} when prompted for the Repository parameter."),
+        ]
 
 
     def _is_binary_string(self, bytes_data, sample_size=1024):
@@ -970,6 +1243,18 @@ Examples:
 
     # Create repository and load code from GitHub specific release
     create_repo.py <repo-name> --source https://github.com/<user>/<repo>/releases/tag/<tag>
+
+    # Create repository, seed it, and (by default) merge dev into test
+    create_repo.py your-webapp
+
+    # Create and seed a repository but DO NOT merge dev into test
+    create_repo.py your-webapp --skip-test-merge
+
+Notes:
+    When a repository is seeded (via --source or a selected application starter),
+    the seeded dev branch is merged into test by default so you can create a test
+    pipeline immediately. Use --skip-test-merge to leave test unchanged. If no
+    source/starter is selected, nothing is seeded and no merge is performed.
 """
 
 def parse_args() -> argparse.Namespace:
@@ -1018,7 +1303,15 @@ def parse_args() -> argparse.Namespace:
                         action='store_true',  # This makes it a flag
                         default=False,        # Default value when flag is not used
                         help='For an AWS SSO login session, whether or not to set the --no-browser flag.')
-    
+
+    parser.add_argument('--skip-test-merge',
+                        action='store_true',  # boolean flag
+                        default=False,         # merge happens by default
+                        help='Do not merge the seeded dev branch into test. '
+                             'By default, when a repository is seeded, dev is '
+                             'merged into test so a test pipeline can be created '
+                             'immediately. The merge only occurs when the repo is seeded.')
+
     args = parser.parse_args()
         
     return args
@@ -1040,7 +1333,8 @@ def main():
             args.repository_name, args.source, 
             args.region, args.profile, 
             args.prefix, args.provider,
-            args.no_browser
+            args.no_browser,
+            skip_test_merge=args.skip_test_merge
         )
         
     except TokenRetrievalError as e:
@@ -1094,6 +1388,12 @@ def main():
 
     click.echo(Colorize.output_with_value("Clone URL (HTTPS):", clone_urls.get('https', '')))
     click.echo(Colorize.output_with_value("Clone URL (SSH):", clone_urls.get('ssh', '')))
+
+    if repo_creator.test_branch_updated:
+        print()
+        for line in repo_creator.build_test_pipeline_hint():
+            click.echo(line)
+
     print()
     click.echo(Colorize.divider("="))
     print()

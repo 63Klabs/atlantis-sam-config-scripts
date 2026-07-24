@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-VERSION = "v0.0.1/2025-05-21"
+VERSION = "v0.1.0/2026-07-24"
 # Developed by Chad Kluck with AI assistance from Amazon Q Developer and GitHub Copilot
 
 """
@@ -393,6 +393,46 @@ class GitHubUtils:
             # Push to remote
             subprocess.run(
                 ["git", "push", "origin", seed_branch],
+                cwd=git_dir, check=True, capture_output=True
+            )
+        except subprocess.CalledProcessError as e:
+            raise Exception(f"Error in GitHub CLI command: {e.cmd}\nOutput: {e.stdout.decode() if e.stdout else ''}\nError: {e.stderr.decode() if e.stderr else ''}")
+
+    @staticmethod
+    def merge_branches_fast_forward(git_dir: str, source_branch: str = 'dev',
+                                    dest_branch: str = 'test') -> None:
+        """Fast-forward merge source_branch into dest_branch in a local clone and push.
+
+        Reuses a clone created during seeding (git user identity already
+        configured). Checks out the destination branch, performs a
+        fast-forward-only merge of the source branch, and pushes the
+        destination branch to origin.
+
+        Args:
+            git_dir (str): Path to the existing local clone to operate in.
+            source_branch (str): Branch to merge from. Defaults to 'dev'.
+            dest_branch (str): Branch to merge into and push. Defaults to 'test'.
+
+        Raises:
+            Exception: If any git command fails (including a
+                non-fast-forwardable merge).
+
+        Example:
+            >>> GitHubUtils.merge_branches_fast_forward('/tmp/clone',
+            ...                                         source_branch='dev',
+            ...                                         dest_branch='test')
+        """
+        try:
+            subprocess.run(
+                ["git", "checkout", dest_branch],
+                cwd=git_dir, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "merge", "--ff-only", source_branch],
+                cwd=git_dir, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "push", "origin", dest_branch],
                 cwd=git_dir, check=True, capture_output=True
             )
         except subprocess.CalledProcessError as e:

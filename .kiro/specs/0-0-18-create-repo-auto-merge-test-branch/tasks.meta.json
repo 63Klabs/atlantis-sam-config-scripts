@@ -1,0 +1,459 @@
+{
+  "pbtResults": {
+    "6.1 Write property test for merge gating logic": {
+      "status": "passed",
+      "lastRunTimestamp": 1784914262427
+    },
+    "6.2 Write property test for follow-up hint command construction": {
+      "status": "passed",
+      "lastRunTimestamp": 1784914499211
+    },
+    "6.3 Write property test for non-fatal failure handling": {
+      "status": "passed",
+      "lastRunTimestamp": 1784914593746
+    },
+    "6.4 Write property test for hint gating on success/skip/failure": {
+      "status": "passed",
+      "lastRunTimestamp": 1784914740079
+    },
+    "6.5 Write property test for GitHub clone reuse and cleanup": {
+      "status": "passed",
+      "lastRunTimestamp": 1784914844049
+    }
+  },
+  "executionHistory": {
+    "1.1 Add `--skip-test-merge` argument to `parse_args()` and update EPILOG": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912671707
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912684059
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912847632
+      }
+    ],
+    "1.2 Add new instance attributes to `RepositoryCreator.__init__()`": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912671950
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912688060
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912849642
+      }
+    ],
+    "2.1 Implement `_merge_dev_to_test()` dispatcher method": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912672171
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784913264777
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784913319554
+      }
+    ],
+    "2.2 Implement `_merge_dev_to_test_codecommit()`": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912672331
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784913395234
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784913481399
+      }
+    ],
+    "2.3 Implement `_merge_dev_to_test_github()`": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912672471
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784913480724
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784913780381
+      }
+    ],
+    "2.4 Implement `_handle_merge_failure()` non-fatal handler": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912672642
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912934454
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784913034894
+      }
+    ],
+    "2.5 Implement `_build_manual_merge_instructions()` helper": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912672910
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912864690
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912934031
+      }
+    ],
+    "2.6 Implement `_skip_test_merge_notice()`": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912673071
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784913035264
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784913210503
+      }
+    ],
+    "3.1 Add `GitHubUtils.merge_branches_fast_forward()` static method in `cli/lib/gh_utils.py`": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912673224
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912688873
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912850100
+      }
+    ],
+    "3.2 Modify `_seed_repository_github()` to retain clone for reuse": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912673371
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784913319368
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784913385574
+      }
+    ],
+    "3.3 Implement `_cleanup_github_clone()` method": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912673576
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784913211433
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784913265503
+      }
+    ],
+    "4.1 Insert merge/skip/cleanup into `create_and_seed_repository()`": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912673788
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784913780161
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784913951472
+      }
+    ],
+    "4.2 Implement `build_test_pipeline_hint()` and print it in `main()`": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912673930
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784913950361
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784914054792
+      }
+    ],
+    "5. Checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912674141
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784914053841
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784914128642
+      }
+    ],
+    "6.1 Write property test for merge gating logic": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912674342
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784914131111
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784914355764
+      }
+    ],
+    "6.2 Write property test for follow-up hint command construction": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912674543
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784914356552
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784914518190
+      }
+    ],
+    "6.3 Write property test for non-fatal failure handling": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912674690
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784914517889
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784914615211
+      }
+    ],
+    "6.4 Write property test for hint gating on success/skip/failure": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912674923
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784914614807
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784914756159
+      }
+    ],
+    "6.5 Write property test for GitHub clone reuse and cleanup": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912675087
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784914755539
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784914859001
+      }
+    ],
+    "7.1 Write unit tests for flag parsing and CodeCommit merge path": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912675250
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784914858192
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784914943928
+      }
+    ],
+    "7.2 Write unit tests for GitHub merge path and `GitHubUtils.merge_branches_fast_forward()`": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912675461
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784914130742
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784914354622
+      }
+    ],
+    "7.3 Write unit tests for skip path, no-source path, and hint output": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912675639
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784914942983
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784915088618
+      }
+    ],
+    "8. Final checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912675791
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784915088834
+      },
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784915141158
+      }
+    ],
+    "1. Add `--skip-test-merge` flag and instance state to `RepositoryCreator`": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784912849822
+      }
+    ],
+    "3. Implement GitHub merge utility and clone lifecycle": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784913385777
+      }
+    ],
+    "2. Implement merge logic and failure handling": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784913780712
+      }
+    ],
+    "4. Wire merge into `create_and_seed_repository()` and follow-up hint into `main()`": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784914055142
+      }
+    ],
+    "6. Property-based tests with Hypothesis": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784914859421
+      }
+    ],
+    "7. Unit tests for merge behavior": [
+      {
+        "executionId": "11df0357-d917-4099-81cc-8434138ce4c1",
+        "chatSessionId": "sess_97fd01d5-6a5f-4efe-9f9b-2d73ef4593fb",
+        "timestamp": 1784915088963
+      }
+    ]
+  }
+}
