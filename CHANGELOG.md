@@ -9,7 +9,7 @@ To update your local cli scripts from GitHub repository:
 - The scripts are still in BETA and features are still being added and tested.
 - Report any issues or requests via the [Issues page in the GitHub repository](https://github.com/63Klabs/atlantis-sam-config-scripts/issues)
 
-## v0.0.18 (unreleased)
+## v0.0.18 (2026-07-25)
 
 ### Added
 - **Automatic dev-to-test Merge on Repository Creation** [Spec: 0-0-18-create-repo-auto-merge-test-branch](.kiro/specs/0-0-18-create-repo-auto-merge-test-branch/)
