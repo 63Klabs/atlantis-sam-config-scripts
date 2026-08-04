@@ -32,6 +32,12 @@
 		"af-south-1",
 		"eu-north-1", "eu-south-1", "eu-south-2", "eu-west-1", "eu-west-2", "eu-west-3", "eu-central-1", "eu-central-2"
 	],
+	"S3ModuleLocationMapping": [
+		{ "region": "us-east-1", "bucket": "63klabs-atlas-us-east-1" },
+		{ "region": "us-east-2", "bucket": "63klabs-zenith-us-east-2" },
+		{ "region": "us-west-1", "bucket": "63klabs-fabric-us-west-1" },
+		{ "region": "us-west-2", "bucket": "63klabs-orbit-us-west-2" }
+	],
 	"tag_keys": [
 		"Owner", "Creator", "CostCenter"
 	]

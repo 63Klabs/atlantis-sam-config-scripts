@@ -1,16 +1,27 @@
 {
-  "atlantis": {
-    "region": "us-east-2",
-    "s3_bucket": "cf-asdf-deployments",
-    "confirm_changeset": true
-  },
-  "parameter_overrides": {
-    "RolePath": "/sam-app/",
-    "ServiceRolePath": "/sam-svc/",
-    "S3BucketNameOrgPrefix": "xcme",
-    "S3ArtifactsBucket": "cf-asdf-deployments",
-    "ParameterStoreHierarchy": "/sam-apps/",
-    "PermissionsBoundaryArn": "arn:aws:iam::123456789012:policy/MyPermissionsBoundary"
-  },
-  "tags": []
+	"atlantis": {
+		"region": "us-east-2",
+		"s3_bucket": "cf-artifacts-replace-with-your-artifacts-bucket-name",
+		"confirm_changeset": true
+	},
+	"parameter_overrides": {
+		"RolePath": "/sam-app/",
+		"ServiceRolePath": "/sam-svc/",
+		"ParameterStoreHierarchy": "/sam-apps/",
+		"S3BucketNameOrgPrefix": "xcme",
+		"S3ArtifactsBucket": "cf-artifacts-replace-with-your-artifacts-bucket-name",
+		"S3ModuleLocation": "",
+		"S3ModuleNamespace": "atlantis",
+		"PermissionsBoundaryArn": "arn:aws:iam::123456789012:policy/MyPermissionsBoundary"
+	},
+	"tags": [
+		{
+			"Key": "Department",
+			"Value": "Web Services"
+		},
+		{
+			"Key": "CostCenter",
+			"Value": "123D"
+		}
+	]
 }

@@ -1,9 +1,19 @@
 {
 	"atlantis": {
-		"PipelineServiceRoleArn": "",
-    	"StorageServiceRoleArn": ""
+		"region": "us-east-2",
+		"s3_bucket": "cf-asdf-deployments",
+		"confirm_changeset": true
 	},
-	"parameter_overrides": {},
+	"parameter_overrides": {
+		"RolePath": "/sam-app/",
+		"ServiceRolePath": "/sam-svc/",
+		"ParameterStoreHierarchy": "/sam-apps/",
+		"S3BucketNameOrgPrefix": "xcme",
+		"S3ArtifactsBucket": "cf-asdf-deployments",
+		"S3ModuleLocation": "",
+		"S3ModuleNamespace": "atlantis",
+		"PermissionsBoundaryArn": "arn:aws:iam::123456789012:policy/MyPermissionsBoundary"
+	},
 	"tags": [
 		{
 			"Key": "Department",
