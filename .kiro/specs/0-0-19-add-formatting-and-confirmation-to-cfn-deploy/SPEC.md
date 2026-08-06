@@ -1,6 +1,6 @@
 # Add Formatting and Confirmation to CloudFormation Deploy
 
-I want to minimize the differences between the two deploy branches.
+I want to minimize the differences between the two deploy branches (SAM with no includes vs CloudFormation with includes) while running deploy.py.
 
 ## Deploy Values
 
@@ -39,3 +39,7 @@ Develop some sort of progress. If we cannot list CloudFormation events on a 10 s
 ## SAM Branch should remain the same
 
 The SAM deployment branch (when there are no includes to resolve) should remain the same and unchanged.
+
+## Recommendations Needed
+
+We are limited by what the CloudFormation CLI commands provide for output and updates. The idea is to make this as close to the SAM branch as possible, but we may need to compromise due to limitations. If there are any recommendations or clarifying questions please ask.

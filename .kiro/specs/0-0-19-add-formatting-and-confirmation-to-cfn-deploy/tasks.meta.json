@@ -1,0 +1,192 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. Add `Colorize`/`click` imports and section-heading helper": [
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786050797422
+      },
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786050807683
+      },
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786050902719
+      }
+    ],
+    "2. Implement the pre-deploy values summary helper": [
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786050797731
+      },
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786050906122
+      },
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786051018962
+      }
+    ],
+    "3. Implement the changeset listing helper": [
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786050798018
+      },
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786051022291
+      },
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786051122911
+      }
+    ],
+    "4. Implement the success banner and Outputs helpers": [
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786050798340
+      },
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786051126268
+      },
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786051284861
+      }
+    ],
+    "5. Implement the manual stack-operation polling loop": [
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786050798603
+      },
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786051288636
+      },
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786051415955
+      }
+    ],
+    "6. Wire the values summary into `_cfn_deploy_packaged`": [
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786050798881
+      },
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786051420376
+      },
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786051496531
+      }
+    ],
+    "7. Add changeset listing + confirmation gate to `_cfn_deploy_packaged`": [
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786050798998
+      },
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786051500057
+      },
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786051623859
+      }
+    ],
+    "8. Replace the execution waiter and add banner/Outputs/failure output": [
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786050799249
+      },
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786051627307
+      },
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786051788773
+      }
+    ],
+    "9. Confirm the SAM branch is unchanged": [
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786050799456
+      },
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786051792681
+      },
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786052473572
+      }
+    ],
+    "10. Add/update unit tests": [
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786050799728
+      },
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786052477047
+      },
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786052725346
+      }
+    ],
+    "11. Review `deploy.py` VERSION and update CHANGELOG.md": [
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786050800042
+      },
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786052729157
+      },
+      {
+        "executionId": "f958c959-aee8-4985-83a4-561c967e3d77",
+        "chatSessionId": "sess_f9082548-0be3-40a4-b85f-0745d40eecd4",
+        "timestamp": 1786052798276
+      }
+    ]
+  }
+}

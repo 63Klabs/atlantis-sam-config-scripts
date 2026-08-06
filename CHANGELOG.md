@@ -22,8 +22,11 @@ To update your local cli scripts from GitHub repository:
   - Deploys the resolved template via a boto3 CloudFormation change set (`TemplateBody`, automatically uploading to the artifact bucket and switching to `TemplateURL` when the template exceeds the 51,200-byte inline limit) instead of `sam deploy`, which previously failed to locate S3-hosted templates and their include artifacts
   - CloudFormation resolves `AWS::Include` and the `AWS::Serverless-2016-10-31` transform server-side, so no local `sam package` or module download is required
   - Templates without S3 includes are unaffected and continue to deploy through `sam deploy`
-
-### Fixed
+- **Script: deploy.py v0.2.0** - Added formatting, changeset confirmation, and progress output to the CloudFormation deploy branch [Spec: 0-0-19-add-formatting-and-confirmation-to-cfn-deploy](.kiro/specs/0-0-19-add-formatting-and-confirmation-to-cfn-deploy/)
+  - Prints a colorized "Deploying with following values" summary (stack name, region, confirm changeset, capabilities, optional role ARN and deployment S3 bucket, parameter overrides, and tags) before creating the change set
+  - Lists the change set (Action, LogicalResourceId, ResourceType, and Replacement/PhysicalResourceId when present) instead of dumping raw JSON, and gates execution behind a `y/N` confirmation prompt when `confirm_changeset` is enabled and not running headless; declining deletes the change set and exits non-zero
+  - Replaces the silent boto3 stack waiter with a polling loop that prints the current stack status each interval, and shows a green success banner followed by a stack Outputs listing on completion
+  - Empty change sets, the SAM deploy branch, and headless behavior are unchanged
 - **Script: deploy.py v0.2.0** - Fixed YAML parsing failure for CloudFormation templates using short-form intrinsic tags [Spec: 0-0-19-yaml-cfn-tag-parsing-fix](.kiro/specs/0-0-19-yaml-cfn-tag-parsing-fix/)
   - Added module-level `_CfnLoader`, a PyYAML `SafeLoader` subclass with a catch-all `!` multi-constructor (using `deep=True`) that converts `!Sub`, `!Ref`, `!If`, `!GetAtt`, and all other CloudFormation short-form YAML tags into their long-form dict equivalents, so templates parse without `ConstructorError` and round-trip losslessly
   - `_has_s3_includes()` correctly detects `Fn::Transform: AWS::Include` S3 locations in templates that mix short-form tags, including `Location` values expressed as `Fn::Sub` or `Fn::Join` intrinsics

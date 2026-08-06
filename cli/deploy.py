@@ -114,11 +114,13 @@ from botocore.exceptions import ClientError
 
 import boto3
 import botocore
+import click
 
 from lib.aws_session import AWSSessionManager
 from lib.logger import ScriptLogger, ConsoleAndLog, Log
 from lib.atlantis import DefaultsLoader, SamconfigReader
 from lib.gitops import Git
+from lib.tools import Colorize
 
 if sys.version_info[0] < 3:
     sys.stderr.write("Error: Python 3 is required\n")
@@ -153,6 +155,329 @@ class TemplateDeployer:
         )
 
         self.settings = config_loader.load_settings()
+
+    def _print_section_heading(self, heading: str) -> None:
+        """Print a section heading with a matching divider, both in yellow.
+
+        Replicates the SAM CLI look for the CloudFormation branch: a bold
+        yellow heading followed by a yellow ``=`` divider line.
+
+        Args:
+            heading: The heading text to display (e.g. ``"Deploying with
+                following values"``).
+
+        Example:
+            >>> deployer._print_section_heading("Initiating deployment")
+        """
+        click.echo(Colorize.output_bold(heading, fg=Colorize.WARNING))
+        click.echo(Colorize.divider('=', fg=Colorize.WARNING))
+
+    def _print_deploy_values_summary(
+        self,
+        deploy_params: dict,
+        cfn_parameters: list,
+        cfn_tags: list,
+        s3_bucket_display: Optional[str] = None,
+    ) -> None:
+        """Print the pre-deploy "Deploying with following values" summary.
+
+        Renders a colorized summary of the values that will be used for the
+        CloudFormation change set, replicating the visibility the SAM branch
+        gets from ``sam deploy``. Each value line uses
+        ``Colorize.output_with_value`` (green label, yellow value).
+
+        Fields are printed in this order: Stack name, Region, Confirm changeset,
+        Capabilities, Role ARN (only when configured), Deployment s3 bucket (only
+        when the template was uploaded to S3), Parameter overrides, and Tags.
+        ``Disable rollback`` and ``Signing Profiles`` are intentionally omitted
+        because this path never sets them.
+
+        Args:
+            deploy_params (dict): Deploy parameters from
+                ``_read_deploy_params_for_packaged`` with keys ``stack_name``,
+                ``region``, ``confirm_changeset``, ``capabilities``, and
+                ``role_arn``.
+            cfn_parameters (list): Parameter overrides as a list of
+                ``{'ParameterKey': ..., 'ParameterValue': ...}`` dicts.
+            cfn_tags (list): Tags as a list of ``{'Key': ..., 'Value': ...}``
+                dicts.
+            s3_bucket_display (str, optional): The artifact S3 bucket to display
+                when the template was uploaded to S3 because it exceeded the
+                inline ``TemplateBody`` size limit. When None (default), the
+                ``Deployment s3 bucket`` line is omitted.
+
+        Example:
+            >>> deployer._print_deploy_values_summary(
+            ...     {'stack_name': 'my-stack', 'region': 'us-east-1',
+            ...      'confirm_changeset': True,
+            ...      'capabilities': 'CAPABILITY_NAMED_IAM', 'role_arn': ''},
+            ...     [{'ParameterKey': 'Env', 'ParameterValue': 'test'}],
+            ...     [{'Key': 'Project', 'Value': 'acme'}],
+            ... )
+        """
+        capabilities = ', '.join(
+            c.strip()
+            for c in str(deploy_params.get('capabilities', '')).split(',')
+            if c.strip()
+        )
+
+        self._print_section_heading("Deploying with following values")
+        click.echo(Colorize.output_with_value(
+            "Stack name", str(deploy_params.get('stack_name', ''))))
+        click.echo(Colorize.output_with_value(
+            "Region", str(deploy_params.get('region', ''))))
+        click.echo(Colorize.output_with_value(
+            "Confirm changeset", str(deploy_params.get('confirm_changeset', ''))))
+        click.echo(Colorize.output_with_value("Capabilities", capabilities))
+
+        role_arn = deploy_params.get('role_arn', '')
+        if role_arn:
+            click.echo(Colorize.output_with_value("Role ARN", str(role_arn)))
+
+        if s3_bucket_display:
+            click.echo(Colorize.output_with_value(
+                "Deployment s3 bucket", str(s3_bucket_display)))
+
+        click.echo(Colorize.output_with_value(
+            "Parameter overrides",
+            self._format_key_value_pairs(
+                cfn_parameters, 'ParameterKey', 'ParameterValue')))
+        click.echo(Colorize.output_with_value(
+            "Tags",
+            self._format_key_value_pairs(cfn_tags, 'Key', 'Value')))
+
+    def _format_key_value_pairs(
+        self, pairs: list, key_field: str, value_field: str
+    ) -> str:
+        """Render a list of key/value dicts as a compact ``{Key: Value, ...}`` string.
+
+        Produces a compact, SAM-table-like representation of parameter overrides
+        or tags without dumping raw API structures.
+
+        Args:
+            pairs (list): List of dicts, each holding a key and a value under
+                ``key_field`` and ``value_field``.
+            key_field (str): The dict key that holds the pair's name
+                (e.g. ``'ParameterKey'`` or ``'Key'``).
+            value_field (str): The dict key that holds the pair's value
+                (e.g. ``'ParameterValue'`` or ``'Value'``).
+
+        Returns:
+            str: A string like ``{Env: test, Region: us-east-1}``. Returns
+            ``{}`` when ``pairs`` is empty.
+
+        Example:
+            >>> deployer._format_key_value_pairs(
+            ...     [{'Key': 'Project', 'Value': 'acme'}], 'Key', 'Value')
+            '{Project: acme}'
+        """
+        rendered = ', '.join(
+            f"{pair.get(key_field, '')}: {pair.get(value_field, '')}"
+            for pair in pairs
+        )
+        return f"{{{rendered}}}"
+
+    def _print_changeset_summary(self, changes: list) -> None:
+        """Print an aligned listing of the pending change set changes.
+
+        Renders a ``Changeset`` heading followed by one aligned line per change,
+        loosely resembling the SAM CLI changeset table. Each line shows the
+        Action, Logical ID, and Resource Type, plus the Replacement flag and
+        Physical ID when those fields are present. Raw change set JSON is never
+        printed.
+
+        Args:
+            changes (list): The ``Changes`` list returned by
+                ``describe_change_set``. Each element is expected to hold a
+                ``ResourceChange`` dict with keys such as ``Action``,
+                ``LogicalResourceId``, ``ResourceType``, ``Replacement``, and
+                ``PhysicalResourceId``.
+
+        Example:
+            >>> deployer._print_changeset_summary([
+            ...     {'ResourceChange': {
+            ...         'Action': 'Modify',
+            ...         'LogicalResourceId': 'MyFunction',
+            ...         'ResourceType': 'AWS::Lambda::Function',
+            ...         'Replacement': 'False',
+            ...         'PhysicalResourceId': 'my-function'}},
+            ... ])
+        """
+        self._print_section_heading("Changeset")
+
+        rows = []
+        show_replacement = False
+        show_physical_id = False
+        for change in changes:
+            resource_change = change.get('ResourceChange', {}) or {}
+            action = str(resource_change.get('Action', ''))
+            logical_id = str(resource_change.get('LogicalResourceId', ''))
+            resource_type = str(resource_change.get('ResourceType', ''))
+            replacement = resource_change.get('Replacement')
+            physical_id = resource_change.get('PhysicalResourceId')
+
+            replacement_text = '' if replacement is None else str(replacement)
+            physical_id_text = '' if physical_id is None else str(physical_id)
+
+            if replacement_text:
+                show_replacement = True
+            if physical_id_text:
+                show_physical_id = True
+
+            rows.append({
+                'Action': action,
+                'LogicalResourceId': logical_id,
+                'ResourceType': resource_type,
+                'Replacement': replacement_text,
+                'PhysicalResourceId': physical_id_text,
+            })
+
+        columns = ['Action', 'LogicalResourceId', 'ResourceType']
+        if show_replacement:
+            columns.append('Replacement')
+        if show_physical_id:
+            columns.append('PhysicalResourceId')
+
+        widths = {
+            column: max(
+                len(column),
+                max((len(row[column]) for row in rows), default=0),
+            )
+            for column in columns
+        }
+
+        header = '  '.join(column.ljust(widths[column]) for column in columns)
+        click.echo(Colorize.output_bold(header, fg=Colorize.OUTPUT))
+        for row in rows:
+            line = '  '.join(row[column].ljust(widths[column]) for column in columns)
+            click.echo(Colorize.output(line, fg=Colorize.OUTPUT_VALUE))
+
+    def _print_success_banner(self) -> None:
+        """Print a green success banner marking a completed deployment.
+
+        Renders a green heading and divider followed by a green success
+        message, matching the completion styling used by the other CLI
+        scripts (e.g. ``delete.py``'s ``Colorize.success`` output). This
+        banner is only shown on a successful (exit code 0) deployment.
+
+        Example:
+            >>> deployer._print_success_banner()
+        """
+        click.echo(Colorize.output_bold(
+            "Successfully deployed stack", fg=Colorize.SUCCESS))
+        click.echo(Colorize.divider('=', fg=Colorize.SUCCESS))
+        click.echo(Colorize.success("Deployment complete."))
+
+    def _print_stack_outputs(self, outputs: list) -> None:
+        """Print the stack Outputs, loosely resembling SAM deploy's display.
+
+        When ``outputs`` contains entries, prints an ``Outputs`` section
+        heading followed by one ``Colorize.output_with_value`` line per
+        output (``OutputKey`` / ``OutputValue``), appending the description
+        when one is present. When ``outputs`` is empty, nothing is printed so
+        that no empty section appears.
+
+        Args:
+            outputs (list): The ``Outputs`` list from
+                ``describe_stacks``. Each element is expected to hold an
+                ``OutputKey`` and ``OutputValue``, and optionally a
+                ``Description``.
+
+        Example:
+            >>> deployer._print_stack_outputs([
+            ...     {'OutputKey': 'ApiUrl',
+            ...      'OutputValue': 'https://example.execute-api.amazonaws.com',
+            ...      'Description': 'Base URL of the deployed API'},
+            ... ])
+        """
+        if not outputs:
+            return
+
+        self._print_section_heading("Outputs")
+        for output in outputs:
+            output_key = str(output.get('OutputKey', ''))
+            output_value = str(output.get('OutputValue', ''))
+            description = output.get('Description')
+
+            if description:
+                output_value = f"{output_value} ({description})"
+
+            click.echo(Colorize.output_with_value(output_key, output_value))
+
+    def _wait_for_stack_operation(
+        self, cfn_client, stack_name: str, change_set_type: str
+    ) -> bool:
+        """Poll a CloudFormation stack until its operation completes.
+
+        Replaces the silent boto3 ``stack_create_complete`` /
+        ``stack_update_complete`` waiter with a manual polling loop modeled on
+        ``delete.py``'s ``delete_stack``. On each in-progress cycle the current
+        ``StackStatus`` is printed in green so the operator can see progress
+        rather than waiting on a silent waiter. The loop polls
+        ``describe_stacks`` every 10 seconds for up to 180 attempts (30
+        minutes), matching ``delete.py``'s cadence and cap.
+
+        Args:
+            cfn_client: A boto3 CloudFormation client used to call
+                ``describe_stacks``.
+            stack_name (str): The name of the stack whose operation is being
+                awaited.
+            change_set_type (str): The change set type driving the operation
+                (``'CREATE'`` or ``'UPDATE'``). Retained for logging/context;
+                success and failure are determined from the live
+                ``StackStatus``.
+
+        Returns:
+            bool: ``True`` when the stack reaches ``CREATE_COMPLETE`` or
+            ``UPDATE_COMPLETE``; ``False`` when it reaches a failure status or
+            the 30-minute cap is exceeded.
+
+        Example:
+            >>> succeeded = deployer._wait_for_stack_operation(
+            ...     cfn_client, 'my-stack', 'UPDATE')
+            >>> if succeeded:
+            ...     print("Stack operation complete")
+        """
+        import time
+
+        max_attempts = 180  # 30 minutes at 10s intervals
+        attempt = 0
+        success_statuses = {'CREATE_COMPLETE', 'UPDATE_COMPLETE'}
+        failure_statuses = {
+            'CREATE_FAILED',
+            'ROLLBACK_COMPLETE',
+            'ROLLBACK_FAILED',
+            'UPDATE_FAILED',
+            'UPDATE_ROLLBACK_COMPLETE',
+            'UPDATE_ROLLBACK_FAILED',
+        }
+
+        try:
+            while attempt < max_attempts:
+                response = cfn_client.describe_stacks(StackName=stack_name)
+                stack_status = response['Stacks'][0]['StackStatus']
+
+                if stack_status in success_statuses:
+                    return True
+
+                if stack_status in failure_statuses:
+                    ConsoleAndLog.error(
+                        f"Stack operation failed with status: {stack_status}")
+                    return False
+
+                click.echo(Colorize.output(
+                    f"Stack update in progress... Status: {stack_status}",
+                    fg=Colorize.SUCCESS))
+                time.sleep(10)
+                attempt += 1
+
+            ConsoleAndLog.error("Stack operation timed out after 30 minutes")
+            return False
+
+        except KeyboardInterrupt:
+            click.echo(Colorize.error("\nOperation cancelled by user"))
+            Log.info("Operation cancelled by user")
+            sys.exit(1)
 
     def get_template_from_config(self) -> str:
         """
@@ -951,6 +1276,9 @@ class TemplateDeployer:
         # and use TemplateURL for larger templates.
         TEMPLATE_BODY_MAX_BYTES = 51200
         template_source = {}
+        # Track the artifact bucket for the values summary; remains None when
+        # the template is small enough to submit inline via TemplateBody.
+        s3_bucket_display = None
         if len(template_body.encode('utf-8')) > TEMPLATE_BODY_MAX_BYTES:
             s3_bucket, s3_prefix = self._read_artifact_bucket_config()
             key = (
@@ -965,8 +1293,15 @@ class TemplateDeployer:
             template_source['TemplateURL'] = (
                 f"https://s3.{region}.amazonaws.com/{s3_bucket}/{key}"
             )
+            s3_bucket_display = s3_bucket
         else:
             template_source['TemplateBody'] = template_body
+
+        # Pre-deploy values summary (parity with the SAM branch). The S3 bucket
+        # line is shown only on the large-template/S3-upload path.
+        self._print_deploy_values_summary(
+            deploy_params, cfn_parameters, cfn_tags, s3_bucket_display
+        )
 
         # Determine if stack exists (CREATE vs UPDATE change set type)
         change_set_type = 'CREATE'
@@ -1057,6 +1392,44 @@ class TemplateDeployer:
             ConsoleAndLog.error("Change set creation failed")
             return 1
 
+        # Change set was created successfully and contains changes. Describe it
+        # to list the pending changes. A failure to describe/list the changes is
+        # treated as non-fatal: it is logged as a warning so it does not fail an
+        # otherwise healthy deploy.
+        try:
+            cs = cfn_client.describe_change_set(
+                StackName=stack_name,
+                ChangeSetName=change_set_name
+            )
+            self._print_changeset_summary(cs.get('Changes', []))
+        except Exception as e:
+            ConsoleAndLog.warning(
+                "Could not list change set changes; continuing with deploy", e
+            )
+
+        # Confirmation gate: honor confirm_changeset unless running headless
+        # (override_confirm_changeset). On decline, delete the pending change
+        # set and return non-zero so main() skips the post-deploy git commit/push
+        # and termination protection.
+        needs_confirm = bool(deploy_params.get('confirm_changeset', True)) \
+            and not self.override_confirm_changeset
+        if needs_confirm:
+            if not click.confirm(
+                Colorize.question("Deploy this change set?"), default=False
+            ):
+                ConsoleAndLog.info("Deployment cancelled by user.")
+                try:
+                    cfn_client.delete_change_set(
+                        StackName=stack_name,
+                        ChangeSetName=change_set_name
+                    )
+                except Exception:
+                    pass
+                return 1
+
+        # Initiating deployment (yellow heading, parity with the SAM branch)
+        self._print_section_heading("Initiating deployment")
+
         # Execute the change set
         ConsoleAndLog.info(f"Executing change set '{change_set_name}'...")
         try:
@@ -1068,34 +1441,46 @@ class TemplateDeployer:
             ConsoleAndLog.error(f"Failed to execute change set: {str(e)}")
             return 1
 
-        # Wait for stack operation to complete
+        # Wait for the stack operation to complete using a manual polling loop
+        # (green per-interval StackStatus) rather than a silent boto3 waiter.
         ConsoleAndLog.info("Waiting for stack update to complete...")
-        wait_waiter_name = (
-            'stack_create_complete' if change_set_type == 'CREATE'
-            else 'stack_update_complete'
+        succeeded = self._wait_for_stack_operation(
+            cfn_client, stack_name, change_set_type
         )
-        waiter = cfn_client.get_waiter(wait_waiter_name)
-        try:
-            waiter.wait(
-                StackName=stack_name,
-                WaiterConfig={'Delay': 15, 'MaxAttempts': 120}
-            )
+
+        if succeeded:
             ConsoleAndLog.info(f"Stack '{stack_name}' deployed successfully.")
-            return 0
-        except Exception as e:
-            ConsoleAndLog.error(f"Stack operation failed: {str(e)}")
-            # Print stack events for diagnosis
+            self._print_success_banner()
+            # Read and display the stack Outputs. A failure to read/print the
+            # Outputs is non-fatal: it is logged as a warning and does not
+            # change the (successful) exit code.
             try:
-                events = cfn_client.describe_stack_events(StackName=stack_name)
-                for event in events['StackEvents'][:10]:
-                    if event.get('ResourceStatus', '').endswith('FAILED'):
-                        ConsoleAndLog.error(
-                            f"  {event['LogicalResourceId']}: "
-                            f"{event.get('ResourceStatusReason', 'no reason')}"
-                        )
-            except Exception:
-                pass
-            return 1
+                describe = cfn_client.describe_stacks(StackName=stack_name)
+                outputs = describe['Stacks'][0].get('Outputs', [])
+                if outputs:
+                    self._print_stack_outputs(outputs)
+            except Exception as e:
+                ConsoleAndLog.warning(
+                    "Could not read stack Outputs; deployment succeeded", e
+                )
+            return 0
+
+        # Failure path: print up to 10 FAILED stack events for diagnosis,
+        # colorized with Colorize.error while preserving log-file continuity.
+        ConsoleAndLog.error("Stack operation failed.")
+        try:
+            events = cfn_client.describe_stack_events(StackName=stack_name)
+            for event in events['StackEvents'][:10]:
+                if event.get('ResourceStatus', '').endswith('FAILED'):
+                    message = (
+                        f"  {event['LogicalResourceId']}: "
+                        f"{event.get('ResourceStatusReason', 'no reason')}"
+                    )
+                    Log.error(message)
+                    click.echo(Colorize.error(message))
+        except Exception:
+            pass
+        return 1
 
 # =============================================================================
 # ----- Main function ---------------------------------------------------------
