@@ -10,7 +10,7 @@
 		"ParameterStoreHierarchy": "/sam-apps/",
 		"S3BucketNameOrgPrefix": "xcme",
 		"S3ArtifactsBucket": "cf-artifacts-replace-with-your-artifacts-bucket-name",
-		"S3ModuleLocation": "",
+		"S3ModuleLocation": "63klabs-atlas-us-east-1",
 		"S3ModuleNamespace": "atlantis",
 		"PermissionsBoundaryArn": "arn:aws:iam::123456789012:policy/MyPermissionsBoundary"
 	},
