@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-VERSION = "v0.1.0/2025-02-28"
+VERSION = "v0.2.0/2026-08-06"
 # Developed by Chad Kluck with AI assistance from Amazon Q Developer
 
 """
@@ -542,3 +542,232 @@ class DefaultsLoader:
                 Log.error(f"Error loading config file {config_file}: {e}")
         
         return defaults
+
+
+# -------------------------------------------------------------------------
+# - Samconfig Reader
+# -------------------------------------------------------------------------
+
+
+class SamconfigReader:
+    """Read and parse SAM configuration (samconfig.toml) files.
+
+    Provides low-level helpers for loading raw TOML deploy parameters and
+    parsing the ``parameter_overrides`` string format used by SAM CLI.
+    This class is intentionally dependency-free (no AWS clients, no UI)
+    so it can be used from any script without side effects.
+
+    The ``parameter_overrides`` string in samconfig files is written by
+    ``config.py`` in the SAM CLI quoted format::
+
+        "Key1"="Value1" "Key2"="Value2"
+
+    Plain (unquoted) ``Key=Value`` pairs are also supported.
+    ``shlex.split`` handles both formats correctly: it strips outer quotes
+    during shell-style tokenisation, which is identical to the approach
+    used in ``config.py``.
+
+    Example:
+        >>> reader = SamconfigReader(Path('samconfigs/acme/myapp/samconfig-acme-myapp-pipeline.toml'))
+        >>> overrides = reader.read_parameter_overrides('test')
+        >>> overrides['S3ModuleLocation']
+        '63klabz'
+
+        >>> params = reader.read_deploy_params('test')
+        >>> params['s3_bucket']
+        'cf-artifacts-123456789012-us-east-1'
+    """
+
+    def __init__(self, config_file: Path) -> None:
+        """Initialise the reader with a path to a samconfig TOML file.
+
+        Args:
+            config_file: Absolute or relative path to the samconfig TOML file.
+        """
+        self._config_file = config_file
+
+    # ------------------------------------------------------------------
+    # Public interface
+    # ------------------------------------------------------------------
+
+    def read_parameter_overrides(self, stage_id: str) -> Dict[str, str]:
+        """Return the merged parameter_overrides for *stage_id*.
+
+        Reads ``parameter_overrides`` from ``default.deploy.parameters`` and
+        from ``{stage_id}.deploy.parameters``, merges them (stage wins), then
+        parses the combined string into a ``{name: value}`` dict.
+
+        Args:
+            stage_id: SAM stage name (e.g. ``'test'``, ``'prod'``,
+                ``'default'``).
+
+        Returns:
+            Dict mapping parameter names to their string values. Returns an
+            empty dict when ``parameter_overrides`` is absent or empty.
+
+        Raises:
+            ValueError: When the samconfig file cannot be read or is not
+                valid TOML, wrapping the underlying error message.
+
+        Example:
+            >>> reader = SamconfigReader(Path('samconfig.toml'))
+            >>> reader.read_parameter_overrides('test')
+            {'Prefix': 'acme', 'S3ModuleLocation': '63klabz', 'S3ModuleNamespace': 'atlantis'}
+        """
+        raw = self._load_toml()
+        merged = self._merge_stage_params(raw, stage_id)
+        param_str = merged.get('parameter_overrides', '')
+        return self.parse_parameter_overrides(param_str)
+
+    def read_deploy_params(self, stage_id: str) -> Dict:
+        """Return the merged raw deploy parameters for *stage_id*.
+
+        Merges ``default.deploy.parameters`` with
+        ``{stage_id}.deploy.parameters`` (stage wins). Values are returned
+        as-is (strings, booleans, etc.) without further parsing.
+
+        This is a lower-level helper used to read fields like ``s3_bucket``,
+        ``s3_prefix``, ``region``, and ``role_arn``.
+
+        Args:
+            stage_id: SAM stage name.
+
+        Returns:
+            Dict of raw deploy parameter key/value pairs.
+
+        Raises:
+            ValueError: When the samconfig file cannot be read or is not
+                valid TOML.
+
+        Example:
+            >>> reader = SamconfigReader(Path('samconfig.toml'))
+            >>> params = reader.read_deploy_params('test')
+            >>> params['s3_bucket']
+            'cf-artifacts-123456789012-us-east-1'
+        """
+        raw = self._load_toml()
+        return self._merge_stage_params(raw, stage_id)
+
+    def read_atlantis_params(self) -> Dict:
+        """Return the raw deploy parameters from the ``atlantis`` section.
+
+        The ``atlantis`` section holds shared deployment settings that apply
+        across all stages (e.g. ``s3_bucket``, ``region``).
+
+        Returns:
+            Dict of raw deploy parameter key/value pairs from
+            ``atlantis.deploy.parameters``, or an empty dict if the section
+            does not exist.
+
+        Raises:
+            ValueError: When the samconfig file cannot be read or is not
+                valid TOML.
+
+        Example:
+            >>> reader = SamconfigReader(Path('samconfig.toml'))
+            >>> reader.read_atlantis_params()
+            {'s3_bucket': 'cf-artifacts-123456789012-us-east-1', 'region': 'us-east-1'}
+        """
+        raw = self._load_toml()
+        return (
+            raw.get('atlantis', {})
+               .get('deploy', {})
+               .get('parameters', {})
+        )
+
+    @staticmethod
+    def parse_parameter_overrides(parameter_string: str) -> Dict[str, str]:
+        """Parse a SAM CLI ``parameter_overrides`` string into a dict.
+
+        Uses ``shlex.split`` to handle both the plain ``Key=Value`` format
+        and the quoted ``"Key"="Value"`` format generated by ``config.py``.
+        Shell tokenisation strips outer quotes, so values with embedded
+        spaces (e.g. ``"Department"="Web Services"``) are handled correctly.
+
+        This is a static method so it can be called without constructing a
+        ``SamconfigReader`` instance when only the parsing step is needed.
+
+        Args:
+            parameter_string: Raw ``parameter_overrides`` string from a
+                samconfig TOML, e.g.::
+
+                    '"Prefix"="acme" "S3ModuleLocation"="63klabz"'
+
+        Returns:
+            Dict mapping parameter names to their string values. Returns an
+            empty dict when *parameter_string* is empty or ``None``.
+
+        Example:
+            >>> SamconfigReader.parse_parameter_overrides(
+            ...     '"Prefix"="acme" "S3ModuleLocation"="63klabz"'
+            ... )
+            {'Prefix': 'acme', 'S3ModuleLocation': '63klabz'}
+
+            >>> SamconfigReader.parse_parameter_overrides(
+            ...     'Env=prod Bucket=my-bucket'
+            ... )
+            {'Env': 'prod', 'Bucket': 'my-bucket'}
+        """
+        import shlex
+
+        parameters: Dict[str, str] = {}
+        if not parameter_string:
+            return parameters
+
+        try:
+            parts = shlex.split(parameter_string)
+            for part in parts:
+                if '=' in part:
+                    key, value = part.split('=', 1)
+                    parameters[key.strip()] = value.strip()
+                else:
+                    Log.warning(f"Skipping invalid parameter_overrides token: {part!r}")
+        except Exception as e:
+            Log.error(f"Error parsing parameter_overrides: {str(e)}")
+
+        return parameters
+
+    # ------------------------------------------------------------------
+    # Private helpers
+    # ------------------------------------------------------------------
+
+    def _load_toml(self) -> Dict:
+        """Load and return the raw TOML dict.
+
+        Raises:
+            ValueError: Wrapping any I/O or parse error.
+        """
+        import tomli
+
+        try:
+            with open(self._config_file, 'rb') as f:
+                return tomli.load(f)
+        except FileNotFoundError:
+            raise ValueError(f"Samconfig file not found: {self._config_file}")
+        except tomli.TOMLDecodeError as e:
+            raise ValueError(f"Invalid samconfig TOML: {str(e)}")
+        except Exception as e:
+            raise ValueError(f"Failed to read samconfig: {str(e)}")
+
+    @staticmethod
+    def _merge_stage_params(raw: Dict, stage_id: str) -> Dict:
+        """Merge default and stage deploy.parameters (stage wins).
+
+        Args:
+            raw: The full parsed TOML dict.
+            stage_id: Stage name to overlay on top of ``default``.
+
+        Returns:
+            Merged dict of deploy parameter key/value pairs.
+        """
+        default_params = (
+            raw.get('default', {})
+               .get('deploy', {})
+               .get('parameters', {})
+        )
+        stage_params = (
+            raw.get(stage_id, {})
+               .get('deploy', {})
+               .get('parameters', {})
+        )
+        return {**default_params, **stage_params}

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 VERSION = "v0.2.0/2026-08-06"
-# Created by Chad Kluck with AI assistance from Amazon Q Developer
+# Created by Chad Kluck with AI assistance from Amazon Q Developer and Kiro
 # GitHub Copilot assisted in color formats of output and prompts
 
 # Usage Information:
@@ -18,6 +18,96 @@ import argparse
 import traceback
 import tomli  # Make sure to pip install tomli
 import yaml
+
+
+# CloudFormation tags that do NOT take the "Fn::" prefix in long form.
+_CFN_TAGS_WITHOUT_FN_PREFIX = {"Ref", "Condition"}
+
+
+def _cfn_construct_getatt(node):
+    """Construct the long-form value for a !GetAtt tag.
+
+    ``!GetAtt Resource.Attr`` -> ``["Resource", "Attr"]``
+    ``!GetAtt [Resource, Attr]`` -> ``["Resource", "Attr"]``
+
+    Args:
+        node: The YAML node carrying the !GetAtt value (scalar or sequence).
+
+    Returns:
+        A list of path components suitable for the long-form ``Fn::GetAtt``.
+
+    Raises:
+        yaml.constructor.ConstructorError: When the node value is neither a
+            string nor a list.
+    """
+    if isinstance(node.value, str):
+        return node.value.split(".", 1)
+    if isinstance(node.value, list):
+        return [getattr(item, "value", item) for item in node.value]
+    raise yaml.constructor.ConstructorError(
+        None, None, f"Unexpected node type for !GetAtt: {type(node)}", node.start_mark
+    )
+
+
+class _CfnLoader(yaml.SafeLoader):
+    """SafeLoader that converts CloudFormation short-form tags to long form.
+
+    PyYAML's SafeLoader raises ConstructorError for tags such as !Sub, !Ref,
+    !GetAtt, !If, etc. A catch-all multi-constructor (registered below via
+    ``add_multi_constructor("!", ...)``) converts each short-form tag into its
+    equivalent long-form dict, e.g. ``!Sub "x"`` becomes ``{"Fn::Sub": "x"}``
+    and ``!Ref X`` becomes ``{"Ref": "X"}``. Long form is valid CloudFormation,
+    so a template parsed with this loader can be re-emitted with a plain
+    ``yaml.dump`` without losing or corrupting any intrinsic functions.
+
+    Nested values are constructed eagerly (``deep=True``) so that sibling
+    branches of multi-branch templates (e.g. multiple Conditions or Resources)
+    are fully populated rather than left null.
+
+    Example:
+        >>> import yaml
+        >>> yaml.load("Loc: !Sub 's3://${B}/k'", Loader=_CfnLoader)
+        {'Loc': {'Fn::Sub': 's3://${B}/k'}}
+    """
+    pass
+
+
+def _cfn_tag_multi_constructor(loader, tag_suffix, node):
+    """Convert a CloudFormation short-form tag node into a long-form dict.
+
+    Args:
+        loader: The active YAML loader instance.
+        tag_suffix: The tag name without the leading '!' (e.g. 'Sub', 'GetAtt').
+        node: The YAML node being constructed.
+
+    Returns:
+        A single-key dict mapping the long-form intrinsic name to its value,
+        e.g. {'Fn::Sub': 's3://...'} or {'Ref': 'MyParam'}.
+
+    Raises:
+        yaml.constructor.ConstructorError: When an unexpected node type is
+            encountered for a CF tag.
+    """
+    key = (
+        tag_suffix if tag_suffix in _CFN_TAGS_WITHOUT_FN_PREFIX
+        else "Fn::" + tag_suffix
+    )
+
+    if tag_suffix == "GetAtt":
+        return {key: _cfn_construct_getatt(node)}
+    if isinstance(node, yaml.ScalarNode):
+        return {key: loader.construct_scalar(node)}
+    if isinstance(node, yaml.SequenceNode):
+        return {key: loader.construct_sequence(node, deep=True)}
+    if isinstance(node, yaml.MappingNode):
+        return {key: loader.construct_mapping(node, deep=True)}
+    raise yaml.constructor.ConstructorError(
+        None, None, f"Unexpected node type for tag !{tag_suffix}", node.start_mark
+    )
+
+
+_CfnLoader.add_multi_constructor("!", _cfn_tag_multi_constructor)
+
 from pathlib import Path
 from typing import Optional
 from botocore.exceptions import ClientError
@@ -27,7 +117,7 @@ import botocore
 
 from lib.aws_session import AWSSessionManager
 from lib.logger import ScriptLogger, ConsoleAndLog, Log
-from lib.atlantis import DefaultsLoader
+from lib.atlantis import DefaultsLoader, SamconfigReader
 from lib.gitops import Git
 
 if sys.version_info[0] < 3:
@@ -185,10 +275,11 @@ class TemplateDeployer:
         """Deploy template from either S3 or local file.
 
         If the template contains Fn::Transform: AWS::Include entries with S3
-        Location URLs, downloads the referenced modules to local temp files,
-        rewrites Location values to relative paths, runs sam package to resolve
-        the includes natively, then passes the packaged output to sam deploy.
-        Templates without S3 includes proceed directly to sam deploy unchanged.
+        Location URLs, resolves the include locations to literal S3 URLs
+        (substituting samconfig parameter values) and deploys via a
+        CloudFormation change set, letting CloudFormation resolve AWS::Include
+        and AWS::Serverless transforms server-side. Templates without S3
+        includes proceed directly to sam deploy unchanged.
 
         Args:
             template_path: Either an S3 URL (s3://) or a local file path
@@ -257,25 +348,21 @@ class TemplateDeployer:
                             ConsoleAndLog.error(f"Failed to download template: {str(e)}")
                         return 1
 
-                    # Route: package+deploy or direct deploy
+                    # Route: resolve S3 includes + CloudFormation deploy, or direct deploy
                     if self._has_s3_includes(temp_template_path):
                         ConsoleAndLog.info(
-                            "S3 includes detected - using sam package + deploy flow"
+                            "S3 includes detected - resolving includes and deploying via CloudFormation"
                         )
                         try:
-                            rewritten_template = self._prepare_template_with_s3_includes(
+                            resolved_template = self._resolve_template_includes(
                                 temp_template_path, temp_dir_path
                             )
-                            s3_bucket, s3_prefix = self._read_artifact_bucket_config()
-                            packaged_template = temp_dir_path / "template-packaged.yml"
-                            package_result = self._run_sam_package(
-                                rewritten_template, packaged_template, s3_bucket, s3_prefix
+                            deploy_params = self._read_deploy_params_for_packaged()
+                            return self._cfn_deploy_packaged(
+                                resolved_template, deploy_params
                             )
-                            if package_result != 0:
-                                return package_result
-                            return self._run_sam_deploy(packaged_template, config_path)
                         except ValueError as e:
-                            ConsoleAndLog.error(f"Failed to prepare template: {str(e)}")
+                            ConsoleAndLog.error(f"Failed to resolve template: {str(e)}")
                             return 1
                     else:
                         ConsoleAndLog.info(
@@ -298,22 +385,18 @@ class TemplateDeployer:
                     with tempfile.TemporaryDirectory() as temp_dir:
                         temp_dir_path = Path(temp_dir)
                         ConsoleAndLog.info(
-                            "S3 includes detected in local template - using sam package + deploy flow"
+                            "S3 includes detected in local template - resolving includes and deploying via CloudFormation"
                         )
                         try:
-                            rewritten_template = self._prepare_template_with_s3_includes(
+                            resolved_template = self._resolve_template_includes(
                                 local_template_path, temp_dir_path
                             )
-                            s3_bucket, s3_prefix = self._read_artifact_bucket_config()
-                            packaged_template = temp_dir_path / "template-packaged.yml"
-                            package_result = self._run_sam_package(
-                                rewritten_template, packaged_template, s3_bucket, s3_prefix
+                            deploy_params = self._read_deploy_params_for_packaged()
+                            return self._cfn_deploy_packaged(
+                                resolved_template, deploy_params
                             )
-                            if package_result != 0:
-                                return package_result
-                            return self._run_sam_deploy(packaged_template, config_path)
                         except ValueError as e:
-                            ConsoleAndLog.error(f"Failed to prepare template: {str(e)}")
+                            ConsoleAndLog.error(f"Failed to resolve template: {str(e)}")
                             return 1
                 else:
                     return self._run_sam_deploy(local_template_path, config_path)
@@ -351,16 +434,17 @@ class TemplateDeployer:
             raise
 
 
-    def _run_sam_deploy(self, template_path: Path, config_path: Path) -> int:
-        """
-        Execute the SAM deploy command.
-        
+    def _run_sam_deploy(self, template_path, config_path: Path) -> int:
+        """Execute the SAM deploy command.
+
         Args:
-            template_path: Path to the template file
-            config_path: Path to the config file
-            
+            template_path: Local path or filename of the template to deploy.
+                Relative names are resolved against the samconfig directory
+                (the subprocess ``cwd``).
+            config_path: Path to the samconfig TOML file.
+
         Returns:
-            int: Return code from sam deploy
+            Exit code from sam deploy (0 for success, non-zero for failure).
         """
         sam_cmd = [
             "sam.cmd" if os.name == 'nt' else "sam",
@@ -370,15 +454,15 @@ class TemplateDeployer:
             "--config-file", str(config_path),
             "--no-fail-on-empty-changeset"
         ]
-        
+
         if self.override_confirm_changeset:
             sam_cmd.append("--no-confirm-changeset")
 
         if self.profile:
             sam_cmd.extend(["--profile", self.profile])
-        
+
         ConsoleAndLog.info(f"Executing: {' '.join(sam_cmd)}")
-        
+
         result = subprocess.run(
             sam_cmd,
             cwd=self.get_samconfig_dir(),
@@ -392,7 +476,7 @@ class TemplateDeployer:
                 'TERM': 'xterm-256color' if os.name != 'nt' else os.environ.get('TERM', '')
             }
         )
-        
+
         return result.returncode
 
     # -------------------------------------------------------------------------
@@ -458,6 +542,28 @@ class TemplateDeployer:
                 url_lower.startswith('https://s3.amazonaws.com/') or
                 ('.s3.' in url_lower and url_lower.startswith('https://')))
 
+    def _location_probe_string(self, location) -> str:
+        """Return a best-effort string form of an AWS::Include Location for detection.
+
+        Handles plain strings and the long-form dict intrinsics that _CfnLoader
+        produces (Fn::Sub string form, Fn::Sub list form, Fn::Join). Returns an
+        empty string when no string form can be extracted.
+        """
+        if isinstance(location, str):
+            return location
+        if isinstance(location, dict):
+            if 'Fn::Sub' in location:
+                sub = location['Fn::Sub']
+                if isinstance(sub, str):
+                    return sub
+                if isinstance(sub, list) and sub and isinstance(sub[0], str):
+                    return sub[0]
+            if 'Fn::Join' in location:
+                join = location['Fn::Join']
+                if isinstance(join, list) and len(join) == 2 and isinstance(join[1], list):
+                    return ''.join(p for p in join[1] if isinstance(p, str))
+        return ''
+
     def _has_s3_includes(self, template_path: Path) -> bool:
         """Check if template contains Fn::Transform: AWS::Include with S3 locations.
 
@@ -483,7 +589,7 @@ class TemplateDeployer:
 
             # Try YAML first (most common), fall back to JSON
             try:
-                template = yaml.safe_load(content)
+                template = yaml.load(content, Loader=_CfnLoader)
             except yaml.YAMLError:
                 template = json.loads(content)
 
@@ -496,7 +602,8 @@ class TemplateDeployer:
                         if isinstance(transform, dict):
                             name = transform.get('Name', '')
                             location = transform.get('Parameters', {}).get('Location', '')
-                            if name == 'AWS::Include' and self._is_s3_url(location):
+                            probe = self._location_probe_string(location)
+                            if name == 'AWS::Include' and self._is_s3_url(probe):
                                 return True
 
                     # Recurse into dict values
@@ -518,162 +625,14 @@ class TemplateDeployer:
             ConsoleAndLog.warning(f"Could not scan template for S3 includes: {str(e)}")
             return False  # Fail open - proceed with direct deploy
 
-    def _read_parameter_overrides(self) -> dict:
-        """Read and parse parameter_overrides from the active samconfig TOML stage.
-
-        Opens the samconfig TOML, reads parameter_overrides from
-        default.deploy.parameters and the active stage's deploy.parameters.
-        Stage values take precedence over default values. Parses the
-        "Key1=Value1 Key2=Value2" format into a dict.
-
-        Returns:
-            Dict mapping parameter names to their string values. Returns an
-            empty dict when parameter_overrides is absent or empty.
-
-        Raises:
-            ValueError: When the samconfig file cannot be read or parsed,
-                wrapping the underlying exception message.
-
-        Example:
-            >>> # With samconfig containing: parameter_overrides = "Env=prod Bucket=my-bucket"
-            >>> deployer._read_parameter_overrides()
-            {'Env': 'prod', 'Bucket': 'my-bucket'}
-        """
-        try:
-            config_file = self.get_samconfig_file_path()
-            with open(config_file, 'rb') as f:
-                config = tomli.load(f)
-
-            # Read from default section
-            default_params = (
-                config.get('default', {})
-                      .get('deploy', {})
-                      .get('parameters', {})
-            )
-            # Read from active stage section
-            stage_params = (
-                config.get(self.stage_id, {})
-                      .get('deploy', {})
-                      .get('parameters', {})
-            )
-
-            # Merge: stage overrides default
-            merged = {**default_params, **stage_params}
-
-            # Extract and parse the parameter_overrides string
-            param_overrides_str = merged.get('parameter_overrides', '')
-
-            overrides = {}
-            if param_overrides_str:
-                for pair in param_overrides_str.split():
-                    if '=' in pair:
-                        key, value = pair.split('=', 1)
-                        overrides[key] = value
-
-            return overrides
-
-        except Exception as e:
-            raise ValueError(f"Failed to read parameter overrides: {str(e)}")
-
-    def _resolve_parameter_references(self, location, parameter_overrides: dict) -> str:
-        """Resolve CloudFormation parameter references in a Location value.
-
-        Supports plain strings (passed through unchanged), Ref, Fn::Sub (string
-        and list forms), and Fn::Join. Recursively resolves nested intrinsics
-        within Fn::Join parts.
-
-        Args:
-            location: Location value from template. May be a plain string or a
-                dict containing a CloudFormation intrinsic function (Ref, Fn::Sub,
-                Fn::Join).
-            parameter_overrides: Dict mapping parameter names to their resolved
-                string values (sourced from samconfig TOML parameter_overrides).
-
-        Returns:
-            Resolved S3 URL as a concrete string.
-
-        Raises:
-            ValueError: When a referenced parameter is absent from
-                parameter_overrides, with the parameter name in the message.
-            ValueError: When the location format is unsupported.
-
-        Example:
-            >>> deployer._resolve_parameter_references(
-            ...     's3://my-bucket/path/to/file.yml', {}
-            ... )
-            's3://my-bucket/path/to/file.yml'
-
-            >>> deployer._resolve_parameter_references(
-            ...     {'Ref': 'S3ModuleLocation'},
-            ...     {'S3ModuleLocation': 's3://my-bucket/modules'}
-            ... )
-            's3://my-bucket/modules'
-        """
-        # Plain string — pass through unchanged
-        if isinstance(location, str):
-            return location
-
-        if isinstance(location, dict):
-            # Handle Ref
-            if 'Ref' in location:
-                param_name = location['Ref']
-                if param_name not in parameter_overrides:
-                    raise ValueError(
-                        f"Parameter '{param_name}' not found in parameter_overrides"
-                    )
-                return parameter_overrides[param_name]
-
-            # Handle Fn::Sub
-            if 'Fn::Sub' in location:
-                sub_value = location['Fn::Sub']
-
-                # Simple string form: Fn::Sub: '${Param}/path'
-                if isinstance(sub_value, str):
-                    result = sub_value
-                    for param_name, param_value in parameter_overrides.items():
-                        result = result.replace(f'${{{param_name}}}', param_value)
-                    # Check for any unresolved references
-                    import re
-                    unresolved = re.findall(r'\$\{([^}]+)\}', result)
-                    if unresolved:
-                        raise ValueError(
-                            f"Parameter '{unresolved[0]}' not found in parameter_overrides"
-                        )
-                    return result
-
-                # List form: Fn::Sub: ['${Param}/path', {Param: value}]
-                if isinstance(sub_value, list) and len(sub_value) == 2:
-                    template_str = sub_value[0]
-                    inline_map = sub_value[1] if isinstance(sub_value[1], dict) else {}
-                    result = template_str
-                    for key, value in inline_map.items():
-                        result = result.replace(f'${{{key}}}', str(value))
-                    return result
-
-            # Handle Fn::Join
-            if 'Fn::Join' in location:
-                join_value = location['Fn::Join']
-                if isinstance(join_value, list) and len(join_value) == 2:
-                    delimiter = join_value[0]
-                    parts = []
-                    for part in join_value[1]:
-                        if isinstance(part, str):
-                            parts.append(part)
-                        else:
-                            # Recursively resolve nested intrinsics
-                            parts.append(
-                                self._resolve_parameter_references(part, parameter_overrides)
-                            )
-                    return delimiter.join(parts)
-
-        raise ValueError(f"Unsupported Location format: {location!r}")
-
     def _read_artifact_bucket_config(self) -> tuple[str, str]:
         """Read artifact bucket configuration from the samconfig TOML.
 
-        Reads s3_bucket and s3_prefix from atlantis.deploy.parameters (the
-        shared Atlantis section) and the active stage's deploy.parameters.
+        Reads ``s3_bucket`` and ``s3_prefix`` from ``atlantis.deploy.parameters``
+        (the shared Atlantis section) and the active stage's ``deploy.parameters``.
         Stage values take precedence over atlantis values.
+
+        Delegates TOML loading to :class:`~lib.atlantis.SamconfigReader`.
 
         Returns:
             Tuple of (s3_bucket, s3_prefix). s3_prefix is an empty string
@@ -693,168 +652,144 @@ class TemplateDeployer:
             >>> s3_prefix
             'my-prefix'
         """
-        try:
-            config_file = self.get_samconfig_file_path()
-            with open(config_file, 'rb') as f:
-                config = tomli.load(f)
+        reader = SamconfigReader(self.get_samconfig_file_path())
+        atlantis_params = reader.read_atlantis_params()
+        stage_params = reader.read_deploy_params(self.stage_id)
 
-            # Shared Atlantis section
-            atlantis_params = (
-                config.get('atlantis', {})
-                      .get('deploy', {})
-                      .get('parameters', {})
-            )
-            # Active stage section
-            stage_params = (
-                config.get(self.stage_id, {})
-                      .get('deploy', {})
-                      .get('parameters', {})
-            )
+        s3_bucket = stage_params.get('s3_bucket') or atlantis_params.get('s3_bucket')
+        s3_prefix = stage_params.get('s3_prefix') or atlantis_params.get('s3_prefix', '')
 
-            # Stage overrides atlantis
-            s3_bucket = stage_params.get('s3_bucket') or atlantis_params.get('s3_bucket')
-            s3_prefix = stage_params.get('s3_prefix') or atlantis_params.get('s3_prefix', '')
-
-            if not s3_bucket:
-                raise ValueError(
-                    "s3_bucket not configured in samconfig. "
-                    "Templates with S3 includes require an artifact bucket. "
-                    "Run 'config.py' to configure s3_bucket."
-                )
-
-            return s3_bucket, (s3_prefix or '')
-
-        except tomli.TOMLDecodeError as e:
-            raise ValueError(f"Invalid samconfig TOML: {str(e)}")
-        except FileNotFoundError:
+        if not s3_bucket:
             raise ValueError(
-                f"Samconfig file not found: {self.get_samconfig_file_path()}"
+                "s3_bucket not configured in samconfig. "
+                "Templates with S3 includes require an artifact bucket. "
+                "Run 'config.py' to configure s3_bucket."
             )
 
-    def _download_s3_module(self, s3_url: str, temp_dir: Path, index: int) -> str:
-        """Download an S3 module file to a local temp file.
+        return s3_bucket, (s3_prefix or '')
 
-        Selects an anonymous or authenticated S3 client based on whether the
-        bucket is public, then downloads the module to temp_dir. The local
-        filename is derived from the S3 key's extension (defaults to .yml when
-        the key has no extension).
+    def _read_parameter_overrides(self) -> dict:
+        """Read and parse parameter_overrides from the active samconfig TOML stage.
 
-        Args:
-            s3_url: S3 URL of the module to download (s3://bucket/key or
-                https:// path-style / virtual-hosted-style URLs are not
-                supported here — use the s3:// form).
-            temp_dir: Directory in which to write the downloaded module file.
-            index: Zero-based index used to name the local file uniquely
-                (module-{index}{ext}).
+        Delegates to :class:`~lib.atlantis.SamconfigReader` which merges
+        ``default.deploy.parameters`` and ``{stage_id}.deploy.parameters``
+        (stage wins) then parses the ``parameter_overrides`` string. Both plain
+        ``Key=Value`` and SAM CLI quoted ``"Key"="Value"`` formats are supported.
 
         Returns:
-            Relative path string to the downloaded file, e.g. "./module-0.yml".
+            Dict mapping parameter names to their string values.
 
         Raises:
-            ValueError: When the bucket denies access — includes a message
-                directing the user to check permissions or authentication.
-            ValueError: When the S3 object is not found — includes the S3 URL
-                in the message.
-            ValueError: When any other S3 ClientError occurs — includes the
-                original error message.
-
-        Example:
-            >>> local_path = deployer._download_s3_module(
-            ...     's3://my-bucket/modules/role.yml', Path('/tmp/work'), 0
-            ... )
-            >>> local_path
-            './module-0.yml'
+            ValueError: When the samconfig file cannot be read or parsed.
         """
-        bucket, key, version_id = self.parse_s3_url(s3_url)
+        reader = SamconfigReader(self.get_samconfig_file_path())
+        return reader.read_parameter_overrides(self.stage_id)
 
-        # Derive extension from key; default to .yml
-        ext = Path(key).suffix or '.yml'
-        local_filename = f"module-{index}{ext}"
-        local_path = temp_dir / local_filename
+    def _resolve_parameter_references(self, location, parameter_overrides: dict) -> str:
+        """Resolve CloudFormation parameter references in an AWS::Include Location.
 
-        # Choose client based on bucket visibility
-        s3_client = (
-            self.s3_client_anonymous if self.is_bucket_public(bucket)
-            else self.s3_client
-        )
+        Supports plain strings (``${Param}`` patterns substituted), Ref, Fn::Sub
+        (string and list forms), and Fn::Join. Recursively resolves nested
+        intrinsics within Fn::Join parts. Returns a concrete literal string.
 
-        try:
-            get_args = {'Bucket': bucket, 'Key': key}
-            if version_id is not None:
-                get_args['VersionId'] = version_id
+        Raises:
+            ValueError: When a referenced parameter is absent from
+                parameter_overrides, or the location format is unsupported.
+        """
+        import re
 
-            response = s3_client.get_object(**get_args)
-            with open(local_path, 'wb') as f:
-                f.write(response['Body'].read())
-
-        except ClientError as e:
-            error_code = e.response['Error']['Code']
-            if error_code == 'AccessDenied':
+        if isinstance(location, str):
+            if '${' not in location:
+                return location
+            result = location
+            for param_name, param_value in parameter_overrides.items():
+                result = result.replace(f'${{{param_name}}}', param_value)
+            unresolved = re.findall(r'\$\{([^}]+)\}', result)
+            if unresolved:
                 raise ValueError(
-                    f"Access denied downloading module from {s3_url}. "
-                    "Check bucket permissions or authentication."
+                    f"Parameter '{unresolved[0]}' not found in parameter_overrides"
                 )
-            elif error_code in ('404', 'NoSuchKey'):
-                raise ValueError(f"Module not found at {s3_url}")
-            else:
-                raise ValueError(
-                    f"Failed to download module from {s3_url}: {str(e)}"
-                )
+            return result
 
-        return f"./{local_filename}"
+        if isinstance(location, dict):
+            if 'Ref' in location:
+                param_name = location['Ref']
+                if param_name not in parameter_overrides:
+                    raise ValueError(
+                        f"Parameter '{param_name}' not found in parameter_overrides"
+                    )
+                return parameter_overrides[param_name]
 
-    def _prepare_template_with_s3_includes(
-        self, template_path: Path, temp_dir: Path
-    ) -> Path:
-        """Prepare a template with S3 includes for sam package.
+            if 'Fn::Sub' in location:
+                sub_value = location['Fn::Sub']
+                if isinstance(sub_value, str):
+                    result = sub_value
+                    for param_name, param_value in parameter_overrides.items():
+                        result = result.replace(f'${{{param_name}}}', param_value)
+                    unresolved = re.findall(r'\$\{([^}]+)\}', result)
+                    if unresolved:
+                        raise ValueError(
+                            f"Parameter '{unresolved[0]}' not found in parameter_overrides"
+                        )
+                    return result
+                if isinstance(sub_value, list) and len(sub_value) == 2:
+                    template_str = sub_value[0]
+                    inline_map = sub_value[1] if isinstance(sub_value[1], dict) else {}
+                    result = template_str
+                    for key, value in {**parameter_overrides, **inline_map}.items():
+                        result = result.replace(f'${{{key}}}', str(value))
+                    return result
 
-        Walks the template recursively, resolves CloudFormation parameter
-        references in each S3 Location value, downloads each referenced S3
-        module to a local temp file, and rewrites the Location to the local
-        relative path. The modified template is written to
-        temp_dir/template-rewritten.yml.
+            if 'Fn::Join' in location:
+                join_value = location['Fn::Join']
+                if isinstance(join_value, list) and len(join_value) == 2:
+                    delimiter = join_value[0]
+                    parts = []
+                    for part in join_value[1]:
+                        if isinstance(part, str):
+                            parts.append(part)
+                        else:
+                            parts.append(
+                                self._resolve_parameter_references(part, parameter_overrides)
+                            )
+                    return delimiter.join(parts)
 
-        Each distinct S3 URL is downloaded exactly once; duplicate references
-        reuse the same local file (module map deduplication).
+        raise ValueError(f"Unsupported Location format: {location!r}")
+
+    def _resolve_template_includes(self, template_path: Path, temp_dir: Path) -> Path:
+        """Resolve parameterized S3 AWS::Include locations to literal S3 URLs.
+
+        Parses the template with the tag-preserving _CfnLoader, walks it, and for
+        each Fn::Transform: AWS::Include whose Location resolves to an S3 URL,
+        substitutes CloudFormation parameter references (e.g. ${S3ModuleLocation})
+        with values from the samconfig parameter_overrides so the Location becomes
+        a literal S3 URL. All other intrinsic functions are preserved in long form.
+        The resolved template is written to temp_dir/template-resolved.yml.
+
+        CloudFormation resolves the (now literal) AWS::Include locations and any
+        AWS::Serverless transform server-side at deploy time, so no sam package or
+        module download is required.
 
         Args:
-            template_path: Path to the downloaded template (YAML).
-            temp_dir: Temporary directory for module files and rewritten template.
+            template_path: Path to the downloaded/local template (YAML).
+            temp_dir: Temporary directory for the resolved template.
 
         Returns:
-            Path to the rewritten template (temp_dir / "template-rewritten.yml").
+            Path to temp_dir/template-resolved.yml.
 
         Raises:
             ValueError: Propagated from _resolve_parameter_references when a
-                required parameter is missing or the Location format is
-                unsupported.
-            ValueError: Propagated from _download_s3_module when an S3
-                download fails.
-
-        Example:
-            >>> rewritten = deployer._prepare_template_with_s3_includes(
-            ...     Path('/tmp/work/template.yml'),
-            ...     Path('/tmp/work')
-            ... )
-            >>> rewritten.name
-            'template-rewritten.yml'
+                required parameter is missing or the Location format is unsupported.
         """
-        ConsoleAndLog.info("Preparing template: resolving S3 includes")
+        ConsoleAndLog.info("Resolving S3 include locations in template")
 
-        # Load template
         with open(template_path, 'r') as f:
-            template = yaml.safe_load(f)
+            template = yaml.load(f, Loader=_CfnLoader)
 
-        # Load parameter overrides from samconfig
         parameter_overrides = self._read_parameter_overrides()
 
-        # Maps resolved S3 URL -> local relative path (for deduplication)
-        module_map: dict = {}
-
         def process_includes(obj):
-            """Recursively walk template and rewrite S3 Location values."""
             if isinstance(obj, dict):
-                # Check for Fn::Transform: AWS::Include
                 transform_key = None
                 if 'Fn::Transform' in obj:
                     transform_key = 'Fn::Transform'
@@ -867,114 +802,300 @@ class TemplateDeployer:
                         name = transform.get('Name', '')
                         params = transform.get('Parameters', {})
                         location = params.get('Location', '')
-
-                        if name == 'AWS::Include' and self._is_s3_url(location):
-                            # Resolve parameter references to a concrete URL
-                            resolved_url = self._resolve_parameter_references(
+                        probe = self._location_probe_string(location)
+                        if name == 'AWS::Include' and self._is_s3_url(probe):
+                            resolved = self._resolve_parameter_references(
                                 location, parameter_overrides
                             )
+                            transform['Parameters']['Location'] = resolved
+                            ConsoleAndLog.info(
+                                f"Resolved include location: {resolved}"
+                            )
 
-                            # Download module if not already cached
-                            if resolved_url not in module_map:
-                                local_path = self._download_s3_module(
-                                    resolved_url, temp_dir, len(module_map)
-                                )
-                                module_map[resolved_url] = local_path
-                                ConsoleAndLog.info(
-                                    f"Downloaded module: {resolved_url} -> {local_path}"
-                                )
-
-                            # Rewrite Location to relative local path
-                            transform['Parameters']['Location'] = module_map[resolved_url]
-
-                # Recurse into all dict values
                 for value in obj.values():
                     process_includes(value)
-
             elif isinstance(obj, list):
                 for item in obj:
                     process_includes(item)
 
         process_includes(template)
 
-        # Write rewritten template
-        rewritten_path = temp_dir / "template-rewritten.yml"
-        with open(rewritten_path, 'w') as f:
+        resolved_path = temp_dir / "template-resolved.yml"
+        with open(resolved_path, 'w') as f:
             yaml.dump(template, f, default_flow_style=False, sort_keys=False)
 
-        ConsoleAndLog.info(f"Wrote rewritten template: {rewritten_path}")
-        ConsoleAndLog.info(f"Downloaded {len(module_map)} S3 module(s)")
+        ConsoleAndLog.info(f"Wrote resolved template: {resolved_path}")
+        return resolved_path
 
-        return rewritten_path
+    def _read_deploy_params_for_packaged(self) -> dict:
+        """Read all deploy parameters needed to run sam deploy without --config-file.
 
-    def _run_sam_package(self, template_path: Path, output_path: Path,
-                         s3_bucket: str, s3_prefix: str) -> int:
-        """Execute sam package to resolve includes and upload artifacts.
-
-        Constructs and runs a sam package command, mirroring the pattern of
-        _run_sam_deploy. The command is run with cwd set to the template's
-        parent directory so relative include paths resolve correctly.
-
-        Args:
-            template_path: Path to the rewritten template with local includes.
-            output_path: Path where the packaged output template will be written.
-            s3_bucket: S3 bucket name for artifact uploads.
-            s3_prefix: S3 key prefix for artifact uploads. Omitted from the
-                command when empty.
+        When deploying a packaged template that still contains Fn::Transform
+        AWS::Include entries, passing --config-file to sam deploy causes it to
+        pre-validate every S3 artifact reference in the template, which fails.
+        This method reads all required parameters so they can be passed as
+        explicit CLI flags instead, bypassing SAM's artifact pre-validation.
 
         Returns:
-            Exit code from the sam package subprocess (0 for success, non-zero
-            for failure).
+            Dict with keys: stack_name, capabilities, region, role_arn (optional),
+            confirm_changeset, parameter_overrides (str), tags (str).
+
+        Raises:
+            ValueError: When required parameters (stack_name, region) are missing
+                or the samconfig cannot be read.
 
         Example:
-            >>> exit_code = deployer._run_sam_package(
-            ...     Path('/tmp/work/template-rewritten.yml'),
-            ...     Path('/tmp/work/template-packaged.yml'),
-            ...     'my-artifact-bucket',
-            ...     'my-prefix'
+            >>> params = deployer._read_deploy_params_for_packaged()
+            >>> params['stack_name']
+            'my-stack'
+        """
+        reader = SamconfigReader(self.get_samconfig_file_path())
+        atlantis_params = reader.read_atlantis_params()
+        stage_params = reader.read_deploy_params(self.stage_id)
+
+        # Merge: stage overrides atlantis/default
+        merged = {**atlantis_params, **stage_params}
+
+        stack_name = merged.get('stack_name', '')
+        if not stack_name:
+            raise ValueError(
+                "stack_name not found in samconfig. Run 'config.py' to configure."
+            )
+
+        region = merged.get('region', '')
+        if not region:
+            raise ValueError(
+                "region not found in samconfig. Run 'config.py' to configure."
+            )
+
+        return {
+            'stack_name': stack_name,
+            'capabilities': merged.get('capabilities', 'CAPABILITY_NAMED_IAM'),
+            'region': region,
+            'role_arn': merged.get('role_arn', ''),
+            'confirm_changeset': merged.get('confirm_changeset', True),
+            'parameter_overrides': merged.get('parameter_overrides', ''),
+            'tags': merged.get('tags', ''),
+        }
+
+    def _cfn_deploy_packaged(
+        self, template_path: Path, deploy_params: dict
+    ) -> int:
+        """Deploy a resolved template directly via CloudFormation boto3 API.
+
+        SAM CLI's ``sam deploy`` pre-validates every ``s3://`` URI found inside
+        the template body before submitting to CloudFormation, causing
+        ``Template file not found`` errors for ``Fn::Transform: AWS::Include``
+        artifact references even when those objects exist. Calling CloudFormation
+        directly via boto3 bypasses this pre-validation — CloudFormation handles
+        ``AWS::Include`` macros natively during stack execution.
+
+        Uses a CloudFormation change set workflow:
+        1. Read template body from local packaged template file
+        2. Create a change set (CREATE or UPDATE depending on stack state)
+        3. Wait for change set to finish creating
+        4. If no changes, return 0 (no-op)
+        5. Execute the change set
+        6. Wait for stack operation to complete
+        7. Return 0 on success, 1 on failure
+
+        Args:
+            template_path: Local path to the packaged template file produced by
+                ``sam package``.
+            deploy_params: Dict from ``_read_deploy_params_for_packaged`` with
+                keys: stack_name, capabilities, region, role_arn, confirm_changeset,
+                parameter_overrides (raw string), tags (raw string).
+
+        Returns:
+            0 on success (including no-change deployments), 1 on failure.
+
+        Example:
+            >>> params = deployer._read_deploy_params_for_packaged()
+            >>> exit_code = deployer._cfn_deploy_packaged(
+            ...     Path('/tmp/work/template-packaged.yml'), params
             ... )
             >>> exit_code
             0
         """
-        sam_cmd = [
-            "sam.cmd" if os.name == 'nt' else "sam",
-            "package",
-            "--template-file", str(template_path),
-            "--output-template-file", str(output_path),
-            "--s3-bucket", s3_bucket,
+        import time
+
+        stack_name = deploy_params['stack_name']
+        region = deploy_params['region']
+        capabilities = [
+            c.strip()
+            for c in deploy_params.get('capabilities', 'CAPABILITY_NAMED_IAM').split(',')
+            if c.strip()
+        ]
+        role_arn = deploy_params.get('role_arn', '')
+        parameter_overrides_str = deploy_params.get('parameter_overrides', '')
+        tags_str = deploy_params.get('tags', '')
+
+        # Parse parameter_overrides string → list of {ParameterKey, ParameterValue}
+        params_dict = SamconfigReader.parse_parameter_overrides(parameter_overrides_str)
+        cfn_parameters = [
+            {'ParameterKey': k, 'ParameterValue': v}
+            for k, v in params_dict.items()
         ]
 
-        if s3_prefix:
-            sam_cmd.extend(["--s3-prefix", s3_prefix])
+        # Parse tags string → list of {Key, Value}
+        tags_dict = SamconfigReader.parse_parameter_overrides(tags_str)
+        cfn_tags = [{'Key': k, 'Value': v} for k, v in tags_dict.items()]
 
-        if self.profile:
-            sam_cmd.extend(["--profile", self.profile])
+        # Read template body
+        with open(template_path, 'r') as f:
+            template_body = f.read()
 
-        ConsoleAndLog.info(f"Executing: {' '.join(sam_cmd)}")
+        cfn_client = self.aws_session.get_client('cloudformation', region)
 
-        result = subprocess.run(
-            sam_cmd,
-            cwd=template_path.parent,
-            check=False,
-            stdout=None,
-            stderr=None,
-            shell=True if os.name == 'nt' else False,
-            env={
-                **os.environ,
-                'FORCE_COLOR': '1',
-                'TERM': 'xterm-256color' if os.name != 'nt' else os.environ.get('TERM', '')
-            }
-        )
-
-        if result.returncode != 0:
-            ConsoleAndLog.error(
-                f"sam package failed with exit code {result.returncode}"
+        # CloudFormation caps inline TemplateBody at 51,200 bytes; upload to S3
+        # and use TemplateURL for larger templates.
+        TEMPLATE_BODY_MAX_BYTES = 51200
+        template_source = {}
+        if len(template_body.encode('utf-8')) > TEMPLATE_BODY_MAX_BYTES:
+            s3_bucket, s3_prefix = self._read_artifact_bucket_config()
+            key = (
+                f"{s3_prefix}/template-resolved.yml"
+                if s3_prefix else "template-resolved.yml"
+            )
+            ConsoleAndLog.info(
+                f"Template exceeds {TEMPLATE_BODY_MAX_BYTES} bytes; "
+                f"uploading to s3://{s3_bucket}/{key} for TemplateURL"
+            )
+            self.s3_client.upload_file(str(template_path), s3_bucket, key)
+            template_source['TemplateURL'] = (
+                f"https://s3.{region}.amazonaws.com/{s3_bucket}/{key}"
             )
         else:
-            ConsoleAndLog.info("sam package completed successfully")
-            ConsoleAndLog.info(f"Packaged template written to: {output_path}")
+            template_source['TemplateBody'] = template_body
 
-        return result.returncode
+        # Determine if stack exists (CREATE vs UPDATE change set type)
+        change_set_type = 'CREATE'
+        try:
+            resp = cfn_client.describe_stacks(StackName=stack_name)
+            stack_status = resp['Stacks'][0]['StackStatus']
+            # REVIEW_IN_PROGRESS means a change set was started but never executed
+            if stack_status == 'REVIEW_IN_PROGRESS':
+                change_set_type = 'CREATE'
+            else:
+                change_set_type = 'UPDATE'
+        except cfn_client.exceptions.ClientError as e:
+            if 'does not exist' in str(e):
+                change_set_type = 'CREATE'
+            else:
+                ConsoleAndLog.error(f"Error checking stack status: {str(e)}")
+                return 1
+
+        change_set_name = f"deploy-{int(time.time())}"
+        ConsoleAndLog.info(
+            f"Creating CloudFormation change set '{change_set_name}' "
+            f"({change_set_type}) for stack '{stack_name}'"
+        )
+
+        # Build create_change_set kwargs
+        cs_kwargs = {
+            'StackName': stack_name,
+            'ChangeSetName': change_set_name,
+            'ChangeSetType': change_set_type,
+            'Capabilities': capabilities,
+            'Parameters': cfn_parameters,
+            'Tags': cfn_tags,
+            **template_source,
+        }
+        if role_arn:
+            cs_kwargs['RoleARN'] = role_arn
+
+        try:
+            cfn_client.create_change_set(**cs_kwargs)
+        except Exception as e:
+            ConsoleAndLog.error(f"Failed to create change set: {str(e)}")
+            return 1
+
+        # Wait for change set to finish creating
+        ConsoleAndLog.info("Waiting for change set to be created...")
+        waiter = cfn_client.get_waiter('change_set_create_complete')
+        try:
+            waiter.wait(
+                StackName=stack_name,
+                ChangeSetName=change_set_name,
+                WaiterConfig={'Delay': 5, 'MaxAttempts': 60}
+            )
+        except Exception:
+            # Check if it failed because there are no changes
+            try:
+                cs = cfn_client.describe_change_set(
+                    StackName=stack_name,
+                    ChangeSetName=change_set_name
+                )
+                status = cs.get('Status', '')
+                reason = cs.get('StatusReason', '')
+                if "didn't contain changes" in reason:
+                    ConsoleAndLog.info(f"No changes to deploy: {reason}")
+                    # Clean up the empty change set
+                    try:
+                        cfn_client.delete_change_set(
+                            StackName=stack_name,
+                            ChangeSetName=change_set_name
+                        )
+                    except Exception:
+                        pass
+                    return 0
+                else:
+                    # Real failure (e.g. transform error, permissions issue)
+                    ConsoleAndLog.error(
+                        f"Change set creation failed ({status}): {reason}"
+                    )
+                    try:
+                        cfn_client.delete_change_set(
+                            StackName=stack_name,
+                            ChangeSetName=change_set_name
+                        )
+                    except Exception:
+                        pass
+                    return 1
+            except Exception as inner_e:
+                ConsoleAndLog.error(f"Failed to describe change set: {str(inner_e)}")
+            ConsoleAndLog.error("Change set creation failed")
+            return 1
+
+        # Execute the change set
+        ConsoleAndLog.info(f"Executing change set '{change_set_name}'...")
+        try:
+            cfn_client.execute_change_set(
+                StackName=stack_name,
+                ChangeSetName=change_set_name
+            )
+        except Exception as e:
+            ConsoleAndLog.error(f"Failed to execute change set: {str(e)}")
+            return 1
+
+        # Wait for stack operation to complete
+        ConsoleAndLog.info("Waiting for stack update to complete...")
+        wait_waiter_name = (
+            'stack_create_complete' if change_set_type == 'CREATE'
+            else 'stack_update_complete'
+        )
+        waiter = cfn_client.get_waiter(wait_waiter_name)
+        try:
+            waiter.wait(
+                StackName=stack_name,
+                WaiterConfig={'Delay': 15, 'MaxAttempts': 120}
+            )
+            ConsoleAndLog.info(f"Stack '{stack_name}' deployed successfully.")
+            return 0
+        except Exception as e:
+            ConsoleAndLog.error(f"Stack operation failed: {str(e)}")
+            # Print stack events for diagnosis
+            try:
+                events = cfn_client.describe_stack_events(StackName=stack_name)
+                for event in events['StackEvents'][:10]:
+                    if event.get('ResourceStatus', '').endswith('FAILED'):
+                        ConsoleAndLog.error(
+                            f"  {event['LogicalResourceId']}: "
+                            f"{event.get('ResourceStatusReason', 'no reason')}"
+                        )
+            except Exception:
+                pass
+            return 1
 
 # =============================================================================
 # ----- Main function ---------------------------------------------------------

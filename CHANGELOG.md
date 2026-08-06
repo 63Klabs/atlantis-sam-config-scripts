@@ -11,6 +11,23 @@ To update your local cli scripts from GitHub repository:
 
 ## v0.0.19 (unreleased)
 
+### Added
+- **Library: atlantis.py v0.2.0** - Added `SamconfigReader` for reading deploy configuration from samconfig TOML files [Spec: 0-0-19-yaml-cfn-tag-parsing-fix](.kiro/specs/0-0-19-yaml-cfn-tag-parsing-fix/)
+  - `read_parameter_overrides()`, `read_deploy_params()`, and `read_atlantis_params()` merge the shared `atlantis`/`default` section with the active stage's `deploy.parameters` (stage values win)
+  - Static `parse_parameter_overrides()` parses SAM CLI `parameter_overrides`/`tags` strings (both plain `Key=Value` and quoted `"Key"="Value"` forms, via `shlex.split`) into a dict
+
+### Changed
+- **Script: deploy.py v0.2.0** - Reworked the deploy path for S3-hosted templates that use `AWS::Include` [Spec: 0-0-19-yaml-cfn-tag-parsing-fix](.kiro/specs/0-0-19-yaml-cfn-tag-parsing-fix/)
+  - Resolves CloudFormation parameter references (e.g. `${S3ModuleLocation}`) inside `AWS::Include` `Location` values to literal `s3://` URLs so CloudFormation can retrieve the included modules server-side
+  - Deploys the resolved template via a boto3 CloudFormation change set (`TemplateBody`, automatically uploading to the artifact bucket and switching to `TemplateURL` when the template exceeds the 51,200-byte inline limit) instead of `sam deploy`, which previously failed to locate S3-hosted templates and their include artifacts
+  - CloudFormation resolves `AWS::Include` and the `AWS::Serverless-2016-10-31` transform server-side, so no local `sam package` or module download is required
+  - Templates without S3 includes are unaffected and continue to deploy through `sam deploy`
+
+### Fixed
+- **Script: deploy.py v0.2.0** - Fixed YAML parsing failure for CloudFormation templates using short-form intrinsic tags [Spec: 0-0-19-yaml-cfn-tag-parsing-fix](.kiro/specs/0-0-19-yaml-cfn-tag-parsing-fix/)
+  - Added module-level `_CfnLoader`, a PyYAML `SafeLoader` subclass with a catch-all `!` multi-constructor (using `deep=True`) that converts `!Sub`, `!Ref`, `!If`, `!GetAtt`, and all other CloudFormation short-form YAML tags into their long-form dict equivalents, so templates parse without `ConstructorError` and round-trip losslessly
+  - `_has_s3_includes()` correctly detects `Fn::Transform: AWS::Include` S3 locations in templates that mix short-form tags, including `Location` values expressed as `Fn::Sub` or `Fn::Join` intrinsics
+
 ## v0.0.18 (2026-07-25)
 
 ### Added
