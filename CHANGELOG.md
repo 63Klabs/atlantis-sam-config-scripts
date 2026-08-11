@@ -9,7 +9,7 @@ To update your local cli scripts from GitHub repository:
 - The scripts are still in BETA and features are still being added and tested.
 - Report any issues or requests via the [Issues page in the GitHub repository](https://github.com/63Klabs/atlantis-sam-config-scripts/issues)
 
-## v0.0.19 (unreleased)
+## v0.0.19 (2026-08-10)
 
 ### Added
 - **Library: atlantis.py v0.2.0** - Added `SamconfigReader` for reading deploy configuration from samconfig TOML files [Spec: 0-0-19-yaml-cfn-tag-parsing-fix](.kiro/specs/0-0-19-yaml-cfn-tag-parsing-fix/)
