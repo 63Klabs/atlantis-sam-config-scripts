@@ -20,12 +20,6 @@ __pycache__/
 # -- Items below may be adjusted ----------------------------------------------
 
 
-# acme is used as examples and we don't want to really use or keep them around
-defaults/**/acme-*
-defaults/**/xcme-*
-samconfigs/acme
-samconfigs/xcme
-
 # Comment out/remove these lines if you want your configuration imports and cli log files in the repo - NOT RECOMMENDED
 # Why? - You can use imports for temporary storage as you work on converting to proper configurations. 
 #        Logs can easily conflict and provide no usable info across developers.

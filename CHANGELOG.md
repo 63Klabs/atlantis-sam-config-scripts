@@ -9,6 +9,14 @@ To update your local cli scripts from GitHub repository:
 - The scripts are still in BETA and features are still being added and tested.
 - Report any issues or requests via the [Issues page in the GitHub repository](https://github.com/63Klabs/atlantis-sam-config-scripts/issues)
 
+## v0.0.20 (2026-09-22)
+
+### Added
+- **acme-defaults.json** - Added an example for PREFIX-defaults.json (This will only affect new installs, not updates from the update.py script)
+
+### Updated
+- **defaults.json** - Changed example values of parameters to match admin documentation (This will only affect new installs, not updates from the update.py script)
+
 ## v0.0.19 (2026-08-10)
 
 ### Added

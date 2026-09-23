@@ -1,18 +1,18 @@
 {
 	"atlantis": {
 		"region": "us-east-2",
-		"s3_bucket": "cf-artifacts-replace-with-your-artifacts-bucket-name",
+		"s3_bucket": "cf-artifacts-REPLACE-WITH-YOUR-BUCKET-NAME",
 		"confirm_changeset": true
 	},
 	"parameter_overrides": {
-		"RolePath": "/sam-app/",
-		"ServiceRolePath": "/sam-svc/",
+		"RolePath": "/application-role/",
+		"ServiceRolePath": "/service-role/",
 		"ParameterStoreHierarchy": "/sam-apps/",
-		"S3BucketNameOrgPrefix": "xcme",
-		"S3ArtifactsBucket": "cf-artifacts-replace-with-your-artifacts-bucket-name",
-		"S3ModuleLocation": "63klabs-atlas-us-east-1",
+		"S3BucketNameOrgPrefix": "",
+		"S3ArtifactsBucket": "cf-artifacts-REPLACE-WITH-YOUR-BUCKET-NAME",
+		"S3ModuleLocation": "63klabs-zenith-us-east-2",
 		"S3ModuleNamespace": "atlantis",
-		"PermissionsBoundaryArn": "arn:aws:iam::123456789012:policy/MyPermissionsBoundary"
+		"PermissionsBoundaryArn": ""
 	},
 	"tags": [
 		{

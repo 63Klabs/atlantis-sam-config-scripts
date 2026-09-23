@@ -1,0 +1,15 @@
+{
+  "atlantis": {
+    "region": "us-east-2",
+    "s3_bucket": "cf-artifacts-REPLACE-WITH-YOUR-BUCKET-NAME",
+    "PipelineServiceRoleArn": "arn:aws:iam::XX3456789XX:role/service-role/ACME-CloudFormation-Service-Role-Pipeline-Management",
+    "NetworkServiceRoleArn": "arn:aws:iam::XX3456789XX:role/service-role/ACME-CloudFormation-Service-Role-Network-Management",
+    "StorageServiceRoleArn": "arn:aws:iam::XX3456789XX:role/service-role/ACME-CloudFormation-Service-Role-Storage-Management"
+  },
+  "parameter_overrides": {
+    "RolePath": "/application-role/",
+    "ServiceRolePath": "/service-role/",
+    "ParameterStoreHierarchy": "/sam-apps/"
+  },
+  "tags": []
+}
