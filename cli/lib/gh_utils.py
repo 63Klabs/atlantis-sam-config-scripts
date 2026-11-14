@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
 
-VERSION = "v0.1.0/2026-07-24"
+VERSION = "v0.2.0/2026-11-14"
 # Developed by Chad Kluck with AI assistance from Amazon Q Developer and GitHub Copilot
 
 """
 Utility functions for interacting with GitHub repositories.
 """
 
-import requests
-import tempfile
+import json
 import os
 import shutil
 import subprocess
-import json
+import tempfile
+import time
+
+import requests
 
 from typing import Dict, List, Optional
+
+from lib.logger import Log
 
 # =============================================================================
 # ----- GITHUB UTILS ----------------------------------------------------------
@@ -94,6 +98,135 @@ class GitHubUtils:
         else:
             raise ValueError("Invalid GitHub URL format")
 
+
+    @staticmethod
+    def _format_failed_command(error: subprocess.CalledProcessError) -> str:
+        """Format the command of a failed subprocess call for logging.
+
+        Handles list commands (including non-string items such as Path
+        objects), string commands, and a missing command.
+
+        Args:
+            error (subprocess.CalledProcessError): The error raised by subprocess.
+
+        Returns:
+            str: The command as a single string, or "unknown" if unavailable.
+
+        Example:
+            >>> err = subprocess.CalledProcessError(1, ["git", "push"])
+            >>> GitHubUtils._format_failed_command(err)
+            'git push'
+        """
+        cmd = getattr(error, 'cmd', None)
+        if not cmd:
+            return "unknown"
+        if isinstance(cmd, (list, tuple)):
+            return ' '.join(str(part) for part in cmd)
+        return str(cmd)
+
+    @staticmethod
+    def _format_stderr(error: subprocess.CalledProcessError) -> str:
+        """Get the stderr of a failed subprocess call as text for logging.
+
+        Handles bytes or str stderr (commands run without ``text=True``
+        return bytes).
+
+        Args:
+            error (subprocess.CalledProcessError): The error raised by subprocess.
+
+        Returns:
+            str: The stderr text, or "(no stderr)" if empty or missing.
+
+        Example:
+            >>> err = subprocess.CalledProcessError(1, "git", stderr=b"fatal: oops")
+            >>> GitHubUtils._format_stderr(err)
+            'fatal: oops'
+        """
+        stderr = getattr(error, 'stderr', None)
+        if not stderr:
+            return "(no stderr)"
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode(errors='replace')
+        return str(stderr)
+
+    @staticmethod
+    def _retry_gh_command(command: List[str], max_retries: int = 3) -> subprocess.CompletedProcess:
+        """Execute a GitHub CLI command with retry logic and exponential backoff.
+        
+        Retries the command up to max_retries times if it fails with a
+        CalledProcessError. Uses exponential backoff delays: 1s, 2s, 4s.
+        
+        Args:
+            command: GitHub CLI command as a list (e.g., ["gh", "repo", "view", "owner/repo"])
+            max_retries: Maximum number of retry attempts (default: 3)
+        
+        Returns:
+            subprocess.CompletedProcess: The successful command result
+        
+        Raises:
+            subprocess.CalledProcessError: If all retry attempts are exhausted
+            
+        Example:
+            >>> result = GitHubUtils._retry_gh_command(
+            ...     ["gh", "repo", "view", "owner/repo", "--json", "name"],
+            ...     max_retries=3
+            ... )
+        """
+        from lib.logger import Log
+        
+        # Initial attempt (not counted as a retry)
+        try:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            return result
+        except subprocess.CalledProcessError as e:
+            # Log stderr from initial attempt
+            stderr_text = e.stderr if e.stderr else "(no stderr)"
+            Log.error(f"gh command failed (initial attempt): {' '.join(command)}")
+            Log.error(f"gh command stderr: {stderr_text}")
+            
+            # Store the last error for re-raising after all retries
+            last_error = e
+            
+            # Define delays array: [1, 2, 4] seconds
+            delays = [1, 2, 4]
+            
+            # Retry loop
+            for attempt in range(1, max_retries + 1):
+                # Get delay from array, or use last delay if beyond array length
+                delay = delays[attempt - 1] if attempt - 1 < len(delays) else delays[-1]
+                
+                # Log retry attempt at INFO level
+                Log.info(f"Retrying gh command (attempt {attempt} of {max_retries}) after {delay} second(s)...")
+                
+                # Sleep for the delay
+                time.sleep(delay)
+                
+                # Try the command again
+                try:
+                    result = subprocess.run(
+                        command,
+                        capture_output=True,
+                        text=True,
+                        check=True
+                    )
+                    Log.info(f"gh command succeeded on retry attempt {attempt}")
+                    return result
+                except subprocess.CalledProcessError as e:
+                    # Store the error and continue to next retry
+                    last_error = e
+                    stderr_text = e.stderr if e.stderr else "(no stderr)"
+                    Log.error(f"gh command failed (retry attempt {attempt}): {' '.join(command)}")
+                    Log.error(f"gh command stderr: {stderr_text}")
+            
+            # All retries exhausted
+            repo_name = command[3] if len(command) > 3 else "unknown"
+            Log.error(f"gh command failed after {max_retries + 1} attempts (1 initial + {max_retries} retries) for repository: {repo_name}")
+            raise last_error
 
     @staticmethod
     def get_latest_release(owner: str, repo: str) -> str:
@@ -212,6 +345,8 @@ class GitHubUtils:
 
             return result.returncode == 0
         except subprocess.CalledProcessError as e:
+            stderr_text = e.stderr if e.stderr else "(no stderr)"
+            Log.error(f"gh repo create stderr: {stderr_text}")
             raise Exception(f"Failed to create repository: {e.stderr}")
         except Exception as e:
             raise Exception(f"Failed to create repository: {e}")
@@ -241,30 +376,43 @@ class GitHubUtils:
     def get_repository(repo_name: str) -> Dict[str, str]:
         """
         Get information about a GitHub repository using the GitHub CLI.
+        
+        Retries up to 3 times with exponential backoff (1s, 2s, 4s) if the
+        command fails with a subprocess error. Logs stderr for failed attempts.
+        
         Args:
             repo_name (str): Repository name (e.g., "owner/repo")
+        
         Returns:
             Dict[str, str]: Dictionary containing 'exists' and 'repositoryMetadata' keys
+        
+        Raises:
+            Exception: When gh repo view fails after all retry attempts
+        
+        Example:
+            >>> info = GitHubUtils.get_repository("owner/repo")
+            >>> print(info['repositoryMetadata']['url'])
         """
         try:
             # Use gh CLI to get repository information
-            result = subprocess.run(
-                ["gh", "repo", "view", repo_name, "--json", "name,nameWithOwner,owner,repositoryTopics,sshUrl,isTemplate,templateRepository,visibility,url"],
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            if result.returncode == 0:
-                info = json.loads(result.stdout)
-                info["cloneUrlHttp"] = f"{info.get('url')}.git"
-                info["cloneUrlSsh"] = f"{info.get('sshUrl')}"
-                return {
-                    "exists": True,
-                    "repositoryMetadata": info
-                }
-            else:
-                raise Exception(f"Failed to get repository info: {result.stderr}")
+            Log.info(f"Calling gh repo view for repository: {repo_name}")
+            result = GitHubUtils._retry_gh_command([
+                "gh", "repo", "view", repo_name, "--json",
+                "name,nameWithOwner,owner,repositoryTopics,sshUrl,isTemplate,templateRepository,visibility,url"
+            ])
+            info = json.loads(result.stdout)
+            info["cloneUrlHttp"] = f"{info.get('url')}.git"
+            info["cloneUrlSsh"] = f"{info.get('sshUrl')}"
+            Log.info(f"Successfully retrieved repository info for: {repo_name}")
+            return {
+                "exists": True,
+                "repositoryMetadata": info
+            }
+        except subprocess.CalledProcessError as e:
+            # stderr already logged by _retry_gh_command during retries
+            raise Exception(f"Failed to get repository info: {e}")
         except Exception as e:
+            Log.error(f"Unexpected error in get_repository: {e}")
             raise Exception(f"Failed to get repository info: {str(e)}")
     
     @staticmethod
@@ -277,6 +425,15 @@ class GitHubUtils:
             readme_content (str): Content for the README.md file
             author (str): Author name for commits
             email (str): Author email for commits
+
+        Raises:
+            subprocess.CalledProcessError: If any git/gh command fails. The
+                failed command and its stderr are logged at ERROR level
+                before the error is re-raised.
+
+        Example:
+            >>> GitHubUtils.create_branch_structure(
+            ...     "owner/repo", "# My Repo", "Jane Doe", "jane@example.com")
         """
         temp_dir = tempfile.mkdtemp()
         try:
@@ -320,6 +477,10 @@ class GitHubUtils:
             subprocess.run(["git", "checkout", "-b", "dev"], cwd=temp_dir, check=True, capture_output=True)
             subprocess.run(["git", "push", "-u", "origin", "dev"], cwd=temp_dir, check=True, capture_output=True)
 
+        except subprocess.CalledProcessError as e:
+            Log.error(f"create_branch_structure command failed: {GitHubUtils._format_failed_command(e)}")
+            Log.error(f"stderr: {GitHubUtils._format_stderr(e)}")
+            raise
         finally:
             os.chdir("/")
             shutil.rmtree(temp_dir, ignore_errors=True)
@@ -396,7 +557,11 @@ class GitHubUtils:
                 cwd=git_dir, check=True, capture_output=True
             )
         except subprocess.CalledProcessError as e:
-            raise Exception(f"Error in GitHub CLI command: {e.cmd}\nOutput: {e.stdout.decode() if e.stdout else ''}\nError: {e.stderr.decode() if e.stderr else ''}")
+            cmd_str = GitHubUtils._format_failed_command(e)
+            stderr_text = GitHubUtils._format_stderr(e)
+            Log.error(f"git command failed in create_init_commit: {cmd_str}")
+            Log.error(f"stderr: {stderr_text}")
+            raise Exception(f"Error in GitHub CLI command: {cmd_str}\nError: {stderr_text}")
 
     @staticmethod
     def merge_branches_fast_forward(git_dir: str, source_branch: str = 'dev',
@@ -436,4 +601,8 @@ class GitHubUtils:
                 cwd=git_dir, check=True, capture_output=True
             )
         except subprocess.CalledProcessError as e:
-            raise Exception(f"Error in GitHub CLI command: {e.cmd}\nOutput: {e.stdout.decode() if e.stdout else ''}\nError: {e.stderr.decode() if e.stderr else ''}")
+            cmd_str = GitHubUtils._format_failed_command(e)
+            stderr_text = GitHubUtils._format_stderr(e)
+            Log.error(f"git command failed in merge_branches_fast_forward: {cmd_str}")
+            Log.error(f"git merge stderr: {stderr_text}")
+            raise Exception(f"Error in GitHub CLI command: {cmd_str}\nError: {stderr_text}")

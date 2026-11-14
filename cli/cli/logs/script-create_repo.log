@@ -1,0 +1,10 @@
+2026-11-14 14:46:13,798 - INFO - Auto-deleting failed repository (--cleanup-on-failure): o/r
+2026-11-14 14:46:13,800 - INFO - Deleted failed repository: o/r
+2026-11-14 14:46:13,800 - INFO - User confirmed deletion of failed repository: o/r
+2026-11-14 14:46:13,800 - INFO - Deleted failed repository: o/r
+2026-11-14 14:46:13,801 - INFO - Repository o/r was not deleted (user declined).
+2026-11-14 14:46:13,801 - INFO - Repository o/r was not deleted (user declined).
+2026-11-14 14:46:13,801 - WARNING - Failed to read user input for cleanup prompt, defaulting to 'N' (do not delete)
+2026-11-14 14:46:13,801 - INFO - Auto-deleting failed repository (--cleanup-on-failure): o/r
+2026-11-14 14:46:13,801 - ERROR - Failed to delete repository o/r: Command 'gh' returned non-zero exit status 1.
+2026-11-14 14:46:13,801 - ERROR - gh repo delete stderr: boom

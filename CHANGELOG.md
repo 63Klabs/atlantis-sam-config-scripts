@@ -15,6 +15,18 @@ To update your local cli scripts from GitHub repository:
 - **Script: create_repo.py v0.2.1** - Fixed seeding of CodeCommit repositories from Windows (Git Bash), where files in subdirectories were committed at the repository root with backslashes in their names and `git checkout` failed with `invalid path` [Spec: 0-0-21-git-for-windows-bug-in-file-seeding](.kiro/specs/0-0-21-git-for-windows-bug-in-file-seeding/), addresses [#9](https://github.com/63Klabs/atlantis-sam-config-scripts/issues/9)
   - Seeded file paths are now normalized to `/` separators on every platform before they are committed. Linux, macOS, and WSL output is unchanged.
   - Repositories already seeded from Windows are not repaired by this update. Delete and recreate them, or re-commit the files into the correct directories.
+- **Script: create_repo.py v0.2.5** - Fixed intermittent `gh repo view` failures right after creating a GitHub repository (`Failed to get repository info`) [Spec: 0-0-21-issue-creating-github-repository-error-getting](.kiro/specs/0-0-21-issue-creating-github-repository-error-getting/), addresses [#1](https://github.com/63Klabs/atlantis-sam-config-scripts/issues/1)
+  - `gh repo view` is now retried up to 3 times with backoff (1s, 2s, 4s) before the script gives up
+  - If seeding a GitHub repository fails, the script now asks "Delete repository? (y/N)" (default `N`) so a half-seeded repository can be removed
+  - Added `--cleanup-on-failure` flag to delete the GitHub repository without a prompt when seeding fails, for headless/CI use
+  - stderr from failed `gh` commands is now written to the log
+  - Failures while downloading or extracting the seed source on the GitHub path (for example a `403 Forbidden` from S3) now also offer the same cleanup (or auto-delete with `--cleanup-on-failure`), so no repository is left behind
+  - Temporary directories are now removed after a failed download (for example a `403 Forbidden` from S3) or a failed seeding run. Previously the directory created for the downloaded seed source, and the local clone used for GitHub seeding, could be left behind in the system temp directory. Removal happens after the repository cleanup prompt, never masks the original error, and does not change exit codes or messages.
+  - Fixed an undefined variable in the GitHub repository creation error path. If `gh repo create` did not report success, the script printed `name 'e' is not defined` instead of a meaningful message. It now reports that the GitHub CLI did not report success.
+  - A failed CodeCommit repository cleanup after a seeding failure no longer hides the original error. If deleting the repository fails, the script reports that it may need to be deleted manually and prints the `aws codecommit delete-repository` command (with `--profile` and `--region` when known). The delete is attempted once per run.
+- **Library: gh_utils.py v0.2.0** - Added retry handling and stderr logging for GitHub CLI and git commands [Spec: 0-0-21-issue-creating-github-repository-error-getting](.kiro/specs/0-0-21-issue-creating-github-repository-error-getting/), addresses [#1](https://github.com/63Klabs/atlantis-sam-config-scripts/issues/1)
+  - Added `_retry_gh_command()` helper that runs a `gh` command with up to 3 retries and 1s, 2s, 4s backoff; `get_repository()` now uses it
+  - stderr from failed `gh` and `git` commands is now logged at ERROR level
 
 ## v0.0.20 (2026-09-22)
 

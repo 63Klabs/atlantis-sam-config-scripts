@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-VERSION = "v0.2.1/2026-11-13"
+VERSION = "v0.2.5/2026-11-14"
 # Created by Chad Kluck with AI assistance from Amazon Q Developer
 # GitHub Copilot assisted with GitHub operations and color formats of output and prompts
 
@@ -17,13 +17,16 @@ import base64
 import os
 import argparse
 import sys
+import shlex
 import shutil
+import subprocess
 from pathlib import Path
 from typing import Optional, List, Dict, Union
 from urllib.parse import urlparse
 
 import boto3
 import botocore
+import botocore.exceptions
 import click
 
 from lib.aws_session import AWSSessionManager, TokenRetrievalError
@@ -116,7 +119,7 @@ def _to_codecommit_path(relative_path: str, sep: Optional[str] = None,
 
 class RepositoryCreator:
 
-    def __init__(self, repo_name: str, source: Optional[str] = None, region:  Optional[str] = None, profile: Optional[str] = None, prefix: Optional[str] = None, provider: Optional[str] = None, no_browser: Optional[bool] = False, skip_test_merge: Optional[bool] = False) -> None:
+    def __init__(self, repo_name: str, source: Optional[str] = None, region:  Optional[str] = None, profile: Optional[str] = None, prefix: Optional[str] = None, provider: Optional[str] = None, no_browser: Optional[bool] = False, skip_test_merge: Optional[bool] = False, cleanup_on_failure: Optional[bool] = False) -> None:
         self.repo_name = repo_name
         self.region = region
         self.profile = profile
@@ -126,10 +129,14 @@ class RepositoryCreator:
 
         # Opt-out flag from --skip-test-merge; when True the dev->test merge is skipped
         self.skip_test_merge = skip_test_merge
+        # Flag from --cleanup-on-failure; when True a failed GitHub seed auto-deletes the repository (no prompt)
+        self.cleanup_on_failure = cleanup_on_failure
         # Reused local clone from GitHub seeding (None for CodeCommit)
         self._github_clone_dir = None
         # Set True only after a successful dev->test merge; gates the follow-up hint
         self.test_branch_updated = False
+        # Set True once a CodeCommit delete was attempted, so a failure is reported once and never retried
+        self._codecommit_delete_attempted = False
 
         self.source_type = None
         self.source = None
@@ -256,18 +263,47 @@ class RepositoryCreator:
 
     def create_and_seed_repository(self):
         # Create repository
+        # If this fails, the repository was not created by this run, so no cleanup is offered.
         self._create_repository()
-        
-        # Create branch structure
-        self._create_dev_test_branches()
-        
+
+        # Everything from here until seeding completes runs against a repository this run
+        # just created. On GitHub, any failure here (branch structure, source download or
+        # extract, seeding) goes through one cleanup handler. Inner steps report their own
+        # error and call sys.exit(1), so SystemExit is caught here too and then re-raised
+        # unchanged to keep the exit code and messages. CodeCommit is not affected: each
+        # of its steps keeps its own delete-on-failure logic.
+        #
+        # Temp directory ownership:
+        # - _download_and_extract removes its own directory if it fails and hands it
+        #   to the caller on success.
+        # - _seed_repository_* removes the extracted directory in their ``finally``.
+        # - The GitHub seed clone (self._github_clone_dir) must survive seeding so the
+        #   merge can reuse it. It is removed after the merge step on success, and
+        #   here on failure, after the cleanup prompt/handler has run.
+        try:
+            # Create branch structure
+            self._create_dev_test_branches()
+
+            if (self.source):
+                # Download and extract files
+                temp_dir = self._download_and_extract()
+
+                # Seed repository with initial commit
+                self._seed_repository(temp_dir)
+        except (Exception, SystemExit) as e:
+            try:
+                is_failure = not (isinstance(e, SystemExit) and e.code in (None, 0))
+                if self.provider == 'github' and is_failure:
+                    self._handle_github_seeding_failure()
+            finally:
+                self._cleanup_github_clone()
+            raise
+        except BaseException:
+            # e.g. KeyboardInterrupt: no cleanup prompt, but do not leak the seed clone
+            self._cleanup_github_clone()
+            raise
+
         if (self.source):
-            # Download and extract files
-            temp_dir = self._download_and_extract()
-            
-            # Seed repository with initial commit
-            self._seed_repository(temp_dir)
-            
             # After seeding, merge dev -> test so a test pipeline can be created immediately
             try:
                 if self.skip_test_merge:
@@ -411,8 +447,10 @@ class RepositoryCreator:
                 click.echo(Colorize.output_with_value("GitHub Repository created:", response['repositoryMetadata']['url']))
                 Log.info(f"GitHub Repository created: {response['repositoryMetadata']['url']}")
             else:
-                click.echo(Colorize.error(f"Error creating GitHub repository: {str(e)}"))
-                Log.error(f"Error creating GitHub repository: {str(e)}")
+                # No exception was raised here, so there is no ``e`` to report
+                failure_reason = "GitHub CLI did not report success when creating the repository"
+                click.echo(Colorize.error(f"Error creating GitHub repository: {failure_reason}"))
+                Log.error(f"Error creating GitHub repository: {failure_reason}")
                 sys.exit(1)
             
             return response
@@ -515,7 +553,7 @@ class RepositoryCreator:
         except Exception as e:
             click.echo(Colorize.error(f"Error creating branch structure. Check logs for more information."))
             Log.error(f"Error creating branch structure: {str(e)}")
-            self.codecommit_client.delete_repository(repositoryName=self.repo_name)
+            self._delete_codecommit_repository()
             sys.exit(1)
 
     def _create_dev_test_branches_github(self):
@@ -535,8 +573,51 @@ class RepositoryCreator:
             sys.exit(1)
 
 
+    @staticmethod
+    def _remove_temp_dir(path: Optional[str]) -> None:
+        """Remove a temporary directory without ever raising.
+
+        Cleanup is best-effort and must not mask the error being handled or
+        change an exit code, so any failure is logged and swallowed.
+
+        Args:
+            path (Optional[str]): Directory to remove. ``None`` or empty is a no-op.
+
+        Example:
+            >>> RepositoryCreator._remove_temp_dir("/tmp/seed-abc123")
+        """
+        if not path:
+            return
+        try:
+            shutil.rmtree(path, ignore_errors=True)
+        except Exception as cleanup_error:
+            Log.warning(f"Could not remove temporary directory {path}: {cleanup_error}")
+
     def _download_and_extract(self):
+        """Download the seed source and extract it into a new temporary directory.
+
+        This method owns the temporary directory until it returns. On success the
+        directory is handed to the caller (which passes it to ``_seed_repository``,
+        which removes it). On any failure (exception or ``sys.exit``) the directory
+        is removed here before the failure propagates.
+
+        Returns:
+            str: Path to the directory containing the extracted files.
+
+        Example:
+            >>> temp_dir = creator._download_and_extract()
+        """
         temp_dir = tempfile.mkdtemp()
+        is_handed_off = False
+        try:
+            result = self._download_and_extract_into(temp_dir)
+            is_handed_off = True
+            return result
+        finally:
+            if not is_handed_off:
+                self._remove_temp_dir(temp_dir)
+
+    def _download_and_extract_into(self, temp_dir):
         zip_path = os.path.join(temp_dir, 'source.zip')
 
         if self.source_type == 's3':
@@ -707,8 +788,10 @@ class RepositoryCreator:
         except Exception as e:
             click.echo(Colorize.error(f"Error in download and extract process. Check logs for more information."))
             Log.error(f"Error in download and extract process: {str(e)}")
-            self.codecommit_client.delete_repository(repositoryName=self.repo_name)
-            shutil.rmtree(temp_dir, ignore_errors=True)
+            if self.provider == 'codecommit':
+                self._delete_codecommit_repository()
+            # GitHub: cleanup is offered once by create_and_seed_repository
+            # The temp dir is removed by _download_and_extract
             sys.exit(1)
 
     def _seed_collect_files(self, temp_dir: str) -> List[Dict]:
@@ -736,7 +819,9 @@ class RepositoryCreator:
                 except Exception as e:
                     click.echo(Colorize.error(f"Error processing file {relative_path}"))
                     Log.error(f"Error processing file {relative_path}: {str(e)}")
-                    self.codecommit_client.delete_repository(repositoryName=self.repo_name)
+                    if self.provider == 'codecommit':
+                        self._delete_codecommit_repository()
+                    # GitHub: cleanup is offered once by create_and_seed_repository
                     sys.exit(1)
 
         return all_files
@@ -795,7 +880,7 @@ class RepositoryCreator:
                 except Exception as e:
                     click.echo(Colorize.error(f"Error creating commit for batch {start_idx + 1}-{end_idx}"))
                     Log.error(f"Error creating commit: {str(e)}")
-                    self.codecommit_client.delete_repository(repositoryName=self.repo_name)
+                    self._delete_codecommit_repository()
                     sys.exit(1)
 
             Log.info(f"Repository {self.repo_name} seeded successfully!")
@@ -806,10 +891,10 @@ class RepositoryCreator:
         except Exception as e:
             click.echo(Colorize.error(f"Error in seeding process. Check logs for more information."))
             Log.error(f"Error in seeding process: {str(e)}")
-            self.codecommit_client.delete_repository(repositoryName=self.repo_name)
+            self._delete_codecommit_repository()
             sys.exit(1)
         finally:
-            shutil.rmtree(temp_dir, ignore_errors=True)
+            self._remove_temp_dir(temp_dir)
 
     def _seed_repository_github(self, temp_dir):
         try:
@@ -836,9 +921,147 @@ class RepositoryCreator:
         except Exception as e:
             click.echo(Colorize.error(f"Error in seeding process. Check logs for more information."))
             Log.error(f"Error in seeding process: {str(e)}")
+            # The cleanup prompt or auto-deletion runs once, in create_and_seed_repository
             sys.exit(1)
         finally:
-            shutil.rmtree(temp_dir, ignore_errors=True)
+            self._remove_temp_dir(temp_dir)
+
+    def _is_codecommit_repo_missing_error(self, error: Exception) -> bool:
+        """Check whether an exception means the CodeCommit repository does not exist.
+
+        Recognizes the client's modeled ``RepositoryDoesNotExistException`` and
+        a botocore ``ClientError`` whose error code is
+        ``RepositoryDoesNotExistException``.
+
+        Args:
+            error (Exception): The exception raised by ``delete_repository``.
+
+        Returns:
+            bool: True if the repository is already gone, otherwise False.
+
+        Example:
+            >>> creator._is_codecommit_repo_missing_error(RuntimeError("boom"))
+            False
+        """
+        modeled = getattr(getattr(self.codecommit_client, 'exceptions', None), 'RepositoryDoesNotExistException', None)
+        if isinstance(modeled, type) and issubclass(modeled, BaseException) and isinstance(error, modeled):
+            return True
+        if isinstance(error, botocore.exceptions.ClientError):
+            return error.response.get('Error', {}).get('Code') == 'RepositoryDoesNotExistException'
+        return False
+
+    def _delete_codecommit_repository(self) -> None:
+        """Delete the CodeCommit repository (best-effort, attempted once).
+
+        Used after a failure to remove the partially created repository.
+        This method never raises, because the original failure is the primary
+        error and must stay visible. If the delete fails, the error is logged
+        and the user is shown the manual delete command. A repository that is
+        already gone counts as success. Only the first call per run does
+        anything; later calls are logged and skipped, so a failing delete is
+        not repeated by an outer error handler.
+
+        Returns:
+            None
+
+        Example:
+            >>> creator._delete_codecommit_repository()
+        """
+        if getattr(self, '_codecommit_delete_attempted', False):
+            Log.info(f"CodeCommit repository delete already attempted for {self.repo_name}; skipping")
+            return
+        self._codecommit_delete_attempted = True
+
+        try:
+            self.codecommit_client.delete_repository(repositoryName=self.repo_name)
+            click.echo(Colorize.success(f"Repository {self.repo_name} deleted."))
+            Log.info(f"Deleted failed repository: {self.repo_name}")
+        except Exception as e:
+            try:
+                if self._is_codecommit_repo_missing_error(e):
+                    Log.info(f"Repository {self.repo_name} does not exist; nothing to delete")
+                    return
+                Log.error(f"Failed to delete repository {self.repo_name}: {e}")
+                click.echo(Colorize.error(f"Failed to delete repository {self.repo_name}. You may need to delete it manually."))
+                command = f"aws codecommit delete-repository --repository-name {shlex.quote(str(self.repo_name))}"
+                if self.profile:
+                    command += f" --profile {shlex.quote(str(self.profile))}"
+                region_name = getattr(getattr(self.codecommit_client, 'meta', None), 'region_name', None)
+                if isinstance(region_name, str) and region_name:
+                    command += f" --region {shlex.quote(region_name)}"
+                click.echo(Colorize.output(f"Manual deletion command: {command}"))
+            except Exception as report_error:
+                # Reporting must never mask the original failure
+                Log.error(f"Error while reporting CodeCommit delete failure: {report_error}")
+
+    def _delete_github_repository(self) -> None:
+        """Delete the GitHub repository using the gh CLI (best-effort).
+
+        Used after a seeding failure to remove the partially created
+        repository. Success or failure is logged and shown to the user.
+        This method never raises, because the seeding failure is the primary
+        error.
+
+        Example:
+            >>> creator._delete_github_repository()
+        """
+        try:
+            subprocess.run(
+                ["gh", "repo", "delete", self.repo_name, "--yes"],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            click.echo(Colorize.success(f"Repository {self.repo_name} deleted."))
+            Log.info(f"Deleted failed repository: {self.repo_name}")
+        except subprocess.CalledProcessError as e:
+            stderr_text = e.stderr if e.stderr else "(no stderr)"
+            Log.error(f"Failed to delete repository {self.repo_name}: {e}")
+            Log.error(f"gh repo delete stderr: {stderr_text}")
+            click.echo(Colorize.error("Failed to delete repository. You may need to delete it manually."))
+            click.echo(Colorize.output(f"Manual deletion command: gh repo delete {self.repo_name}"))
+        except Exception as e:
+            Log.error(f"Unexpected error deleting repository {self.repo_name}: {e}")
+            click.echo(Colorize.error("Failed to delete repository. You may need to delete it manually."))
+            click.echo(Colorize.output(f"Manual deletion command: gh repo delete {self.repo_name}"))
+
+    def _handle_github_seeding_failure(self) -> None:
+        """Handle cleanup after GitHub repository seeding fails.
+
+        If ``--cleanup-on-failure`` is set, the repository is deleted without
+        prompting. Otherwise the user is asked whether to delete it (default
+        ``N``). When input is unavailable (EOF or aborted prompt, e.g. in
+        CI/CD), the answer defaults to ``N`` and the repository is kept.
+        Does not raise if deletion fails.
+
+        Example:
+            >>> creator._handle_github_seeding_failure()
+        """
+        if self.cleanup_on_failure:
+            click.echo(Colorize.output(f"Auto-deleting failed repository (--cleanup-on-failure): {self.repo_name}"))
+            Log.info(f"Auto-deleting failed repository (--cleanup-on-failure): {self.repo_name}")
+            self._delete_github_repository()
+            return
+
+        manual_command = f"gh repo delete {self.repo_name}"
+        try:
+            # Colorize.prompt displays the prompt and returns the user's input
+            response = Colorize.prompt(f"Seeding failed. Delete repository {self.repo_name}? (y/N)", "N")
+        except (EOFError, click.exceptions.Abort):
+            # Non-interactive environment (piped input, CI/CD) or aborted prompt
+            Log.warning("Failed to read user input for cleanup prompt, defaulting to 'N' (do not delete)")
+            click.echo(Colorize.output(f"Repository {self.repo_name} was not deleted (non-interactive environment)."))
+            click.echo(Colorize.output(f"You can delete it manually with: {manual_command}"))
+            return
+
+        if str(response).strip().lower() == 'y':
+            click.echo(Colorize.output(f"Deleting repository: {self.repo_name}"))
+            Log.info(f"User confirmed deletion of failed repository: {self.repo_name}")
+            self._delete_github_repository()
+        else:
+            click.echo(Colorize.output(f"Repository {self.repo_name} was not deleted."))
+            click.echo(Colorize.output(f"You can delete it manually with: {manual_command}"))
+            Log.info(f"Repository {self.repo_name} was not deleted (user declined).")
 
 
     def _build_manual_merge_instructions(self) -> List[str]:
@@ -932,7 +1155,8 @@ class RepositoryCreator:
         method removes that directory once the merge/skip decision is complete
         and resets the attribute so it is not reused or cleaned up twice. It is
         called from a ``finally`` block so it runs on every path (merge success,
-        skip, or unexpected error).
+        skip, or unexpected error). It is also called when seeding fails, after
+        the GitHub cleanup handler has run. It never raises.
 
         For the CodeCommit provider, no local clone is created, so
         ``self._github_clone_dir`` remains ``None`` and this method is a no-op.
@@ -943,9 +1167,9 @@ class RepositoryCreator:
             >>> creator._github_clone_dir is None
             True
         """
-        if self._github_clone_dir:
-            shutil.rmtree(self._github_clone_dir, ignore_errors=True)
-            self._github_clone_dir = None
+        clone_dir = self._github_clone_dir
+        self._github_clone_dir = None
+        self._remove_temp_dir(clone_dir)
 
 
     def build_test_pipeline_hint(self) -> List[str]:
@@ -1289,11 +1513,18 @@ Examples:
     # Create and seed a repository but DO NOT merge dev into test
     create_repo.py your-webapp --skip-test-merge
 
+    # Create a GitHub repository and automatically delete it if seeding fails (no prompt)
+    create_repo.py <owner>/your-webapp --provider github --cleanup-on-failure
+
 Notes:
     When a repository is seeded (via --source or a selected application starter),
     the seeded dev branch is merged into test by default so you can create a test
     pipeline immediately. Use --skip-test-merge to leave test unchanged. If no
     source/starter is selected, nothing is seeded and no merge is performed.
+
+    If seeding a GitHub repository fails, you are asked whether to delete the
+    repository (default N). Use --cleanup-on-failure to delete it without a
+    prompt, for example in headless or CI/CD runs.
 """
 
 def parse_args() -> argparse.Namespace:
@@ -1351,6 +1582,11 @@ def parse_args() -> argparse.Namespace:
                              'merged into test so a test pipeline can be created '
                              'immediately. The merge only occurs when the repo is seeded.')
 
+    parser.add_argument('--cleanup-on-failure',
+                        action='store_true',  # boolean flag
+                        default=False,        # prompt the user by default
+                        help='Automatically delete GitHub repository if seeding fails (no prompt)')
+
     args = parser.parse_args()
         
     return args
@@ -1373,7 +1609,8 @@ def main():
             args.region, args.profile, 
             args.prefix, args.provider,
             args.no_browser,
-            skip_test_merge=args.skip_test_merge
+            skip_test_merge=args.skip_test_merge,
+            cleanup_on_failure=args.cleanup_on_failure
         )
         
     except TokenRetrievalError as e:
