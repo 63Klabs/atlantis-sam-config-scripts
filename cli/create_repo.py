@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-VERSION = "v0.2.0/2026-07-24"
+VERSION = "v0.2.1/2026-11-13"
 # Created by Chad Kluck with AI assistance from Amazon Q Developer
 # GitHub Copilot assisted with GitHub operations and color formats of output and prompts
 
@@ -73,6 +73,45 @@ def should_merge_test(source: Optional[str], skip_test_merge: bool) -> bool:
         False
     """
     return bool(source) and not skip_test_merge
+
+
+def _to_codecommit_path(relative_path: str, sep: Optional[str] = None,
+                        altsep: Optional[str] = None) -> str:
+    """Normalize a relative file path to the ``/`` separator CodeCommit expects.
+
+    CodeCommit ``CreateCommit`` treats only ``/`` as a path separator. On
+    Windows ``os.path.relpath`` returns ``\\``-separated paths, which would be
+    stored as literal backslashes in a file name at the repository root. This
+    function replaces the platform separator (and the alternate separator,
+    when it is not already ``/``) with ``/``. When the platform separator is
+    already ``/`` the input is returned unchanged, so a POSIX file name that
+    happens to contain a backslash is not rewritten.
+
+    Args:
+        relative_path (str): Path relative to the seed root, in the host's
+            native form.
+        sep (Optional[str]): Platform separator to replace. Defaults to
+            ``os.sep`` when ``None``. Tests pass ``'\\\\'`` to exercise the
+            Windows case on any host.
+        altsep (Optional[str]): Alternate separator to replace. Defaults to
+            ``os.altsep`` when ``None``.
+
+    Returns:
+        str: ``relative_path`` with ``sep`` and ``altsep`` replaced by ``/``.
+
+    Example:
+        >>> _to_codecommit_path('.github\\\\workflows\\\\deploy.yml', sep='\\\\')
+        '.github/workflows/deploy.yml'
+        >>> _to_codecommit_path('README.md', sep='\\\\')
+        'README.md'
+    """
+    sep = os.sep if sep is None else sep
+    altsep = os.altsep if altsep is None else altsep
+    normalized = relative_path
+    for separator in (sep, altsep):
+        if separator and separator != '/':
+            normalized = normalized.replace(separator, '/')
+    return normalized
 
 
 class RepositoryCreator:
@@ -678,7 +717,7 @@ class RepositoryCreator:
         for root, _, files in os.walk(temp_dir):
             for file in files:
                 full_path = os.path.join(root, file)
-                relative_path = os.path.relpath(full_path, temp_dir)
+                relative_path = _to_codecommit_path(os.path.relpath(full_path, temp_dir))
                 
                 try:
                     with open(full_path, 'rb') as f:

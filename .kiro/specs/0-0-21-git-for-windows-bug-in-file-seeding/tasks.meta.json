@@ -1,0 +1,195 @@
+{
+  "pbtResults": {
+    "1. Write bug condition exploration test": {
+      "status": "passed",
+      "failingExample": "AssertionError: filePath contains a backslash: '.github\\\\workflows\\\\deploy-to-s3.yml' (tmp tree with README.md, .github/workflows/deploy-to-s3.yml, application-infrastructure/build-scripts/generate-put-ssm.py; os.path.relpath patched to return Windows-style backslash paths)",
+      "lastRunTimestamp": 1794611431980
+    }
+  },
+  "executionHistory": {
+    "1. Write bug condition exploration test": [
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611388812
+      },
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611395068
+      },
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611440719
+      }
+    ],
+    "2. Write preservation tests (BEFORE implementing fix)": [
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611389077
+      },
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611445220
+      },
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611478921
+      }
+    ],
+    "3.1 Add the `_to_codecommit_path` helper": [
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611389319
+      },
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611481271
+      },
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611504821
+      }
+    ],
+    "3.2 Route the relpath result through the helper": [
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611389593
+      },
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611506859
+      },
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611543500
+      }
+    ],
+    "3.3 Bump the script version": [
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611389847
+      },
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611543855
+      },
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611560534
+      }
+    ],
+    "3.4 Add helper unit and property tests": [
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611390122
+      },
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611561160
+      },
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611594991
+      }
+    ],
+    "3.5 Verify bug condition exploration test now passes": [
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611390369
+      },
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611595632
+      },
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611635649
+      }
+    ],
+    "3.6 Verify preservation tests still pass": [
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611390623
+      },
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611636310
+      },
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611651640
+      }
+    ],
+    "4. Checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611390845
+      },
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611652155
+      },
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611686449
+      }
+    ],
+    "5. Update CHANGELOG.md": [
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611391172
+      },
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611686887
+      },
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611714934
+      }
+    ],
+    "6. Windows verification before release (maintainer task)": [
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611391482
+      }
+    ],
+    "3. Fix path separators in `cli/create_repo.py`": [
+      {
+        "executionId": "4a97ac23-03ea-4dd9-9976-85e0298bf0c8",
+        "chatSessionId": "sess_04a58b34-4df4-41c8-8833-fc17af5738cb",
+        "timestamp": 1794611651830
+      }
+    ]
+  }
+}
