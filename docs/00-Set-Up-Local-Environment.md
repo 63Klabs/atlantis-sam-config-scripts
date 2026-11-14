@@ -13,9 +13,10 @@ If you are familiar with other tools (`uv`) and can easily translate that is up 
 
 ## Prerequisites
 
-- Python >3.14
+- Python 3.14
 - AWS CLI and AWS SAM
 - GitHub CLI (if using GitHub repos)
+- Git Bash (if using Windows, but WSL is recommended)
 
 ## Python Virtual Environment
 
@@ -50,7 +51,7 @@ python3 -m venv .ve
 source .ve/bin/activate
 
 # On Windows:
-# .ve\Scripts\activate
+# source .ve\Scripts\activate
 
 # Now you can safely install the requirements
 pip install -r ./cli/requirements.txt
