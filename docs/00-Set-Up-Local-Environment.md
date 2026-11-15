@@ -51,7 +51,7 @@ python3 -m venv .ve
 source .ve/bin/activate
 
 # On Windows:
-# source .ve\Scripts\activate
+# source .ve/Scripts/activate
 
 # Now you can safely install the requirements
 pip install -r ./cli/requirements.txt
@@ -75,6 +75,9 @@ To run Python scripts using this environment:
 ```bash
 # Example: Running a script from the cli directory
 ./cli/config.py -h
+
+# NOTE: You may need to place py, python, or python3 in front depending on your system:
+py ./cli/config.py -h
 ```
 
 Some important notes:

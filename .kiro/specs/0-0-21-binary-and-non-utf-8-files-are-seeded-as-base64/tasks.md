@@ -150,7 +150,7 @@ Fix binary and non-UTF-8 files being seeded as base64 text ([issue #11](https://
   - Follow `.kiro/steering/changelog-convention.md` and the format of the neighboring `v0.0.21` entries
   - _Requirements: 5.2, 5.3_
 
-- [~] 7. Release verification and issue housekeeping (maintainer task)
+- [x] 7. Release verification and issue housekeeping (maintainer task)
   - **This task needs AWS and GitHub credentials and a Windows machine, and it creates real repositories. The agent does not run it. Ask the maintainer to do it, and record the result.**
   - **R1 (Linux or macOS):** build a zip with a small PNG, a Latin-1 text file, and a CRLF `.gitignore`, and host it at an S3 location the maintainer controls. Run `./cli/create_repo.py <throwaway-name> --source s3://<bucket>/<key>.zip` and the same with `--provider github`. For each repository, `git clone`, `git checkout dev`, `git checkout test`, and compare `sha256sum` of every file with the original.
   - **R2 (Windows Git Bash, `.ve` venv):** repeat both runs with `git config --global core.autocrlf true`. Confirm checksums match, no file contains `\r\r\n`, the bootstrap `README.md` on `main` has LF endings, and the seeding commit on `dev` does not change that README unless the starter supplies its own.

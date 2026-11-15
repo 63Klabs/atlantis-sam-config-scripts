@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-VERSION = "v0.2.5/2026-11-14"
+VERSION = "v0.2.6/2026-11-15"
 # Created by Chad Kluck with AI assistance from Amazon Q Developer
 # GitHub Copilot assisted with GitHub operations and color formats of output and prompts
 
@@ -114,6 +114,20 @@ def _to_codecommit_path(relative_path: str, sep: Optional[str] = None,
         if separator and separator != '/':
             normalized = normalized.replace(separator, '/')
     return normalized
+
+
+class UnsafeZipMemberError(ValueError):
+    """Raised when a zip member would be extracted outside the extraction directory.
+
+    The message already holds the member name in escaped form, so it is safe to
+    print or log as is.
+
+    Example:
+        >>> raise UnsafeZipMemberError("zip member '../x' resolves outside the extraction directory")
+        Traceback (most recent call last):
+        ...
+        UnsafeZipMemberError: zip member '../x' resolves outside the extraction directory
+    """
 
 
 class RepositoryCreator:
@@ -592,6 +606,73 @@ class RepositoryCreator:
         except Exception as cleanup_error:
             Log.warning(f"Could not remove temporary directory {path}: {cleanup_error}")
 
+    @staticmethod
+    def _escape_member_name(name: str, max_length: int = 200) -> str:
+        """Return a zip member name that is safe to print or log.
+
+        ``repr()`` quotes the name and escapes control characters, newlines,
+        ANSI escape sequences, and non-printable Unicode such as bidirectional
+        overrides. Names longer than ``max_length`` are cut and end with ``...``.
+
+        Args:
+            name (str): The member name as stored in the zip file.
+            max_length (int, optional): Maximum length of the returned string,
+                including quotes and the trailing ``...``. Defaults to 200.
+
+        Returns:
+            str: The escaped, quoted name, at most ``max_length`` characters.
+
+        Example:
+            >>> RepositoryCreator._escape_member_name("../x\\x1b[31m")
+            "'../x\\\\x1b[31m'"
+            >>> RepositoryCreator._escape_member_name("a" * 500).endswith("...")
+            True
+        """
+        escaped = repr(name)
+        if len(escaped) > max_length:
+            escaped = escaped[:max_length - 3] + '...'
+        return escaped
+
+    @staticmethod
+    def _resolve_member_path(base_dir, relative_name: str, member_name: Optional[str] = None) -> Path:
+        """Resolve a member's output path and require it to stay inside ``base_dir``.
+
+        Both paths are resolved before comparing, so ``..`` segments, absolute
+        names, and sibling directories that share a name prefix with
+        ``base_dir`` are detected. A name that resolves to ``base_dir`` itself is
+        not treated as an escape. The returned path is the one to write to, so
+        the path that was checked is the path that is used.
+
+        Args:
+            base_dir (Union[str, os.PathLike]): The extraction directory.
+            relative_name (str): The member's name relative to ``base_dir``.
+            member_name (Optional[str]): The original zip member name to show in
+                the error. Defaults to ``relative_name``.
+
+        Returns:
+            Path: The resolved output path, ``base_dir`` or inside it.
+
+        Raises:
+            UnsafeZipMemberError: If the resolved path is outside ``base_dir``.
+
+        Example:
+            >>> RepositoryCreator._resolve_member_path("/tmp/seed", "src/app.py")
+            PosixPath('/tmp/seed/src/app.py')
+            >>> RepositoryCreator._resolve_member_path("/tmp/seed", "../x")
+            Traceback (most recent call last):
+            ...
+            UnsafeZipMemberError: zip member '../x' resolves outside the extraction directory
+        """
+        base = Path(base_dir).resolve()
+        target = (base / relative_name).resolve()
+        if not target.is_relative_to(base):
+            shown = member_name if member_name is not None else relative_name
+            raise UnsafeZipMemberError(
+                f"zip member {RepositoryCreator._escape_member_name(shown)} "
+                f"resolves outside the extraction directory"
+            )
+        return target
+
     def _download_and_extract(self):
         """Download the seed source and extract it into a new temporary directory.
 
@@ -678,6 +759,8 @@ class RepositoryCreator:
                 
                 # Extract all files
                 for zip_info in zip_ref.filelist:
+                    relative_name = zip_info.filename
+
                     # For GitHub sources, handle the outer directory
                     if self.source_type == 'github':
                         # Skip the root directory entry itself
@@ -686,13 +769,10 @@ class RepositoryCreator:
                             
                         # Remove the common prefix if it exists
                         if common_prefix and zip_info.filename.startswith(common_prefix):
-                            rel_path = zip_info.filename[len(common_prefix):]
-                            output_path = Path(temp_dir) / rel_path
-                        else:
-                            output_path = Path(temp_dir) / zip_info.filename
-                    else:
-                        # Standard path for non-GitHub sources
-                        output_path = Path(temp_dir) / zip_info.filename
+                            relative_name = zip_info.filename[len(common_prefix):]
+
+                    # Reject names that resolve outside temp_dir before anything is created
+                    output_path = self._resolve_member_path(temp_dir, relative_name, zip_info.filename)
                     
                     if zip_info.filename.endswith('/'):
                         output_path.mkdir(parents=True, exist_ok=True)
@@ -722,8 +802,12 @@ class RepositoryCreator:
             return temp_dir
             
         except Exception as e:
-            click.echo(Colorize.error(f"Error in download and extract process. Check logs for more information."))
-            Log.error(f"Error in download and extract process: {str(e)}")
+            if isinstance(e, UnsafeZipMemberError):
+                click.echo(Colorize.error(f"Unsafe source zip: {e}. Nothing was seeded."))
+                Log.error(f"Unsafe source zip rejected: {e}")
+            else:
+                click.echo(Colorize.error(f"Error in download and extract process. Check logs for more information."))
+                Log.error(f"Error in download and extract process: {str(e)}")
             if self.provider == 'codecommit':
                 self._delete_codecommit_repository()
             # GitHub: cleanup is offered once by create_and_seed_repository

@@ -35,6 +35,12 @@ To update your local cli scripts from GitHub repository:
   - `create_init_commit` writes every file as bytes (a `str` is encoded as UTF-8) and clones with `core.autocrlf=false`, so the seeded files match the starter regardless of the user's git line-ending settings.
   - `create_branch_structure` writes the bootstrap README as UTF-8 with `\n` line endings on every platform.
 
+### Security
+- **Script: create_repo.py v0.2.6** - Rejected zip members that resolve outside the extraction directory [Spec: 0-0-21-create-repo-py-reject-zip-members-that-extract](.kiro/specs/0-0-21-create-repo-py-reject-zip-members-that-extract/), addresses [#12](https://github.com/63Klabs/atlantis-sam-config-scripts/issues/12)
+  - Zip member names that contain `..` segments or are absolute paths now stop the run with a clear error and exit status 1, instead of being written outside the temporary directory.
+  - The repository is created before the zip is checked. When a zip is rejected, a CodeCommit repository is deleted. For GitHub, the existing "Delete repository? (y/N)" prompt or `--cleanup-on-failure` applies.
+  - Archives whose members stay inside the extraction directory are unaffected.
+
 ## v0.0.20 (2026-09-22)
 
 ### Added

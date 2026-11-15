@@ -1,0 +1,303 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. Confirm the starting state": [
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794763822339
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794763830301
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794763860613
+      }
+    ],
+    "2.1 Sandbox helpers (`tests/test_create_repo_zip_safety.py`, new file)": [
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794763822720
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794763863109
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794763960952
+      }
+    ],
+    "2.2 Rejection tests (same file)": [
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794763823060
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794763972074
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794764074321
+      }
+    ],
+    "2.3 Failure-path, message, and ordering tests (same file)": [
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794763823330
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794764079102
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794764224534
+      }
+    ],
+    "2.4 Property test (same file)": [
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794763823617
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794764226929
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794764419962
+      }
+    ],
+    "3. Write preservation tests (BEFORE implementing the fix)": [
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794763823854
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794764422498
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794764584851
+      }
+    ],
+    "4.1 Add the exception and the two helpers": [
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794763824175
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794764587195
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794764648605
+      }
+    ],
+    "4.2 Route the loop through the check": [
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794763824393
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794764651068
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794764695938
+      }
+    ],
+    "4.3 Specific message in the failure handler": [
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794763824682
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794764698382
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794764736766
+      }
+    ],
+    "4.4 Helper unit tests (`tests/test_create_repo_zip_safety.py`)": [
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794763824944
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794764740749
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794764814608
+      }
+    ],
+    "4.5 Version marker": [
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794763825196
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794764816837
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794764854998
+      }
+    ],
+    "4.6 Verify the exploration tests now pass": [
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794763825509
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794764857722
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794764880842
+      }
+    ],
+    "4.7 Verify the preservation tests still pass": [
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794763825754
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794764883717
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794764908958
+      }
+    ],
+    "5. Checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794763825999
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794764912821
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794764978309
+      }
+    ],
+    "6. Update `docs/SCRIPT-GUIDE.md`": [
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794763826223
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794764982330
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794765014345
+      }
+    ],
+    "7. Update CHANGELOG.md": [
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794763826522
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794765016862
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794765039126
+      }
+    ],
+    "8. Release verification, spin-offs, and issue housekeeping (maintainer task)": [
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794763826731
+      },
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794765089076
+      }
+    ],
+    "2. Write bug condition exploration tests": [
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794764420288
+      }
+    ],
+    "4. Fix extraction in `cli/create_repo.py`": [
+      {
+        "executionId": "e07b419e-493c-4b81-827c-a277c220c3cf",
+        "chatSessionId": "sess_8a411954-c338-46f9-a2b8-c0a56517b39f",
+        "timestamp": 1794764909194
+      }
+    ]
+  }
+}

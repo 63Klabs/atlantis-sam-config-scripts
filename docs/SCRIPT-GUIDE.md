@@ -20,6 +20,8 @@ For usage info:
 ./cli/create_repo.py -h
 ```
 
+If a source zip contains a path that resolves outside the extraction directory, the script rejects the zip, reports the offending path, and exits with status 1. Nothing is seeded. The repository is created before the zip is checked, so a CodeCommit repository created for the run is deleted. A GitHub repository is kept unless you answer `y` to the "Delete repository? (y/N)" prompt or run the script with `--cleanup-on-failure`.
+
 ## config.py
 
 Create and maintain a CloudFormation stack utilizing stack options stored in a samconfig file and a central template repository managed by your organization (or 63Klabs for training and getting started).

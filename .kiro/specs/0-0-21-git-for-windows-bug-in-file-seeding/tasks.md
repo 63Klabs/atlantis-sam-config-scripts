@@ -112,7 +112,7 @@ Run tests with `source .ve/bin/activate && python -m pytest ...`.
   - Follow `.kiro/steering/changelog-convention.md` and the format of the `v0.0.18` and `v0.0.19` entries
   - _Requirements: 5.3, 5.4_
 
-- [ ] 6. Windows verification before release (maintainer task)
+- [x] 6. Windows verification before release (maintainer task)
   - **This task needs a Windows machine, AWS and GitHub credentials, and creates real repositories. The agent does not run it. Ask the maintainer to do it, and record the result.**
   - Run from Windows Git Bash with the `.ve` venv, using the same starter for both runs:
     - `./cli/create_repo.py <throwaway-name>` (CodeCommit)
