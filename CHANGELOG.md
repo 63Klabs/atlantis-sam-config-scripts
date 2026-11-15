@@ -24,9 +24,16 @@ To update your local cli scripts from GitHub repository:
   - Temporary directories are now removed after a failed download (for example a `403 Forbidden` from S3) or a failed seeding run. Previously the directory created for the downloaded seed source, and the local clone used for GitHub seeding, could be left behind in the system temp directory. Removal happens after the repository cleanup prompt, never masks the original error, and does not change exit codes or messages.
   - Fixed an undefined variable in the GitHub repository creation error path. If `gh repo create` did not report success, the script printed `name 'e' is not defined` instead of a meaningful message. It now reports that the GitHub CLI did not report success.
   - A failed CodeCommit repository cleanup after a seeding failure no longer hides the original error. If deleting the repository fails, the script reports that it may need to be deleted manually and prints the `aws codecommit delete-repository` command (with `--profile` and `--region` when known). The delete is attempted once per run.
+- **Script: create_repo.py v0.2.5** - Fixed binary and non-UTF-8 files in application starters being seeded as base64 text instead of their original bytes in both CodeCommit and GitHub repositories [Spec: 0-0-21-binary-and-non-utf-8-files-are-seeded-as-base64](.kiro/specs/0-0-21-binary-and-non-utf-8-files-are-seeded-as-base64/), addresses [#11](https://github.com/63Klabs/atlantis-sam-config-scripts/issues/11)
+  - File content is now kept as bytes from extraction through seeding. Text files are no longer decoded and re-encoded.
+  - Extracted files are written as bytes, so on Windows existing CRLF line endings are no longer turned into `\r\r\n`.
+  - Repositories already seeded from a starter that contained binary or non-UTF-8 files hold base64 text for those files. This update does not repair them. Delete and recreate them, or re-commit those files.
 - **Library: gh_utils.py v0.2.0** - Added retry handling and stderr logging for GitHub CLI and git commands [Spec: 0-0-21-issue-creating-github-repository-error-getting](.kiro/specs/0-0-21-issue-creating-github-repository-error-getting/), addresses [#1](https://github.com/63Klabs/atlantis-sam-config-scripts/issues/1)
   - Added `_retry_gh_command()` helper that runs a `gh` command with up to 3 retries and 1s, 2s, 4s backoff; `get_repository()` now uses it
   - stderr from failed `gh` and `git` commands is now logged at ERROR level
+- **Library: gh_utils.py v0.2.0** - Fixed GitHub seeding writing files in text mode, which on Windows used the locale code page and rewrote line endings [Spec: 0-0-21-binary-and-non-utf-8-files-are-seeded-as-base64](.kiro/specs/0-0-21-binary-and-non-utf-8-files-are-seeded-as-base64/), addresses [#10](https://github.com/63Klabs/atlantis-sam-config-scripts/issues/10) and [#11](https://github.com/63Klabs/atlantis-sam-config-scripts/issues/11)
+  - `create_init_commit` writes every file as bytes (a `str` is encoded as UTF-8) and clones with `core.autocrlf=false`, so the seeded files match the starter regardless of the user's git line-ending settings.
+  - `create_branch_structure` writes the bootstrap README as UTF-8 with `\n` line endings on every platform.
 
 ## v0.0.20 (2026-09-22)
 

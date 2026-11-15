@@ -13,7 +13,6 @@ VERSION = "v0.2.5/2026-11-14"
 import re
 import tempfile
 import zipfile
-import base64
 import os
 import argparse
 import sys
@@ -704,75 +703,12 @@ class RepositoryCreator:
                     with zip_ref.open(zip_info) as source:
                         content = source.read()
                         
-                        text_extensions = {
-                            # Documentation and Markup
-                            '.txt', '.md', '.markdown', '.rst', '.adoc', '.asciidoc', '.wiki',
-                            
-                            # Web and Styling
-                            '.html', '.htm', '.xhtml', '.css', '.scss', '.sass', '.less',
-                            '.svg', '.xml', '.xsl', '.xslt', '.wsdl', '.dtd',
-                            
-                            # Programming Languages
-                            '.py', '.pyw', '.py3', '.pyi', '.pyx',  # Python
-                            '.js', '.jsx', '.ts', '.tsx', '.mjs',    # JavaScript/TypeScript
-                            '.java', '.kt', '.kts', '.groovy',       # JVM
-                            '.c', '.h', '.cpp', '.hpp', '.cc',       # C/C++
-                            '.cs', '.csx',                           # C#
-                            '.rb', '.rbw', '.rake', '.gemspec',      # Ruby
-                            '.php', '.phtml', '.php3', '.php4',      # PHP
-                            '.go', '.rs', '.r', '.pl', '.pm',        # Go, Rust, R, Perl
-                            
-                            # Shell and cli
-                            '.sh', '.bash', '.zsh', '.fish',
-                            '.bat', '.cmd', '.ps1', '.psm1',
-                            
-                            # Configuration
-                            '.json', '.yaml', '.yml', '.toml', '.tml',
-                            '.ini', '.cfg', '.conf', '.config',
-                            '.env', '.properties', '.prop',
-                            '.xml', '.plist',
-                            
-                            # Build and Project
-                            '.gradle', '.maven', '.pom',
-                            '.project', '.classpath',
-                            '.editorconfig', '.gitignore', '.gitattributes',
-                            'Dockerfile', 'Makefile', 'Jenkinsfile',
-                            
-                            # Data Formats
-                            '.csv', '.tsv', '.sql', '.graphql', '.gql',
-                            
-                            # Lock Files
-                            '.lock', '.lockfile',
-                            
-                            # Template Files
-                            '.template', '.tmpl', '.j2', '.jinja', '.jinja2',
-                            
-                            # AWS and Cloud
-                            '.tf', '.tfvars',              # Terraform
-                            '.template-config',            # AWS CloudFormation
-                            '.cfn.yaml', '.cfn.json',     # AWS CloudFormation
-                            '.sam.yaml', '.sam.json',      # AWS SAM
-                            
-                            # Misc
-                            '.log', '.diff', '.patch',
-                            '.lst', '.tex', '.bib',
-                            '.manifest', '.pdl', '.po'
-                        }
-
-                        is_text_file = (output_path.suffix.lower() in text_extensions and 
-                                        not self._is_binary_string(content))
-
                         if output_path.exists():
                             output_path.unlink()
-                        
-                        if is_text_file:
-                            try:
-                                decoded_content = content.decode('utf-8')
-                                output_path.write_text(decoded_content, encoding='utf-8')
-                            except UnicodeDecodeError:
-                                output_path.write_bytes(content)
-                        else:
-                            output_path.write_bytes(content)
+
+                        # Write the member's bytes unchanged (no text decoding or
+                        # newline translation, which corrupts files on Windows)
+                        output_path.write_bytes(content)
                             
             os.remove(zip_path)
             
@@ -795,7 +731,34 @@ class RepositoryCreator:
             sys.exit(1)
 
     def _seed_collect_files(self, temp_dir: str) -> List[Dict]:
-        """Collect all files in the temp directory and return a list of file dictionaries"""
+        """Collect all files in a directory as CodeCommit file dictionaries.
+
+        Walks the directory tree and reads every file as raw bytes, so text,
+        binary, and non-UTF-8 files are all passed through unchanged. Paths
+        are normalized to ``/`` separators. If a file cannot be read, the
+        error is logged, the CodeCommit repository is deleted (CodeCommit
+        provider only), and the script exits with status 1.
+
+        Args:
+            temp_dir (str): Directory containing the files to seed.
+
+        Returns:
+            List[Dict]: One dictionary per file with the keys:
+                - filePath (str): Path relative to ``temp_dir`` using ``/``.
+                - fileContent (bytes): Raw file content, not decoded or
+                  encoded.
+                - fileMode (str): Always ``'NORMAL'``.
+
+        Example:
+            Illustrative only. The example needs a live RepositoryCreator
+            instance, so it is skipped when run as a doctest.
+
+            >>> files = self._seed_collect_files('/tmp/seed')  # doctest: +SKIP
+            >>> files[0]['filePath']  # doctest: +SKIP
+            'src/app.py'
+            >>> isinstance(files[0]['fileContent'], bytes)  # doctest: +SKIP
+            True
+        """
         all_files = []
         for root, _, files in os.walk(temp_dir):
             for file in files:
@@ -804,13 +767,8 @@ class RepositoryCreator:
                 
                 try:
                     with open(full_path, 'rb') as f:
-                        content = f.read()
-                        
-                    try:
-                        file_content = content.decode('utf-8')
-                    except UnicodeDecodeError:
-                        file_content = base64.b64encode(content).decode('utf-8')
-                        
+                        file_content = f.read()
+
                     all_files.append({
                         'filePath': relative_path,
                         'fileContent': file_content,
@@ -1209,19 +1167,6 @@ class RepositoryCreator:
             Colorize.output(f"Use {self.repo_name} when prompted for the Repository parameter."),
         ]
 
-
-    def _is_binary_string(self, bytes_data, sample_size=1024):
-        """Returns true if the bytes_data appears to be binary rather than text."""
-        if not bytes_data:
-            return False
-        
-        # Take a sample of the file to reduce processing time for large files
-        sample = bytes_data[:sample_size]
-        text_characters = bytes(b'').join(bytes([i]) for i in range(32, 127)) + b'\n\r\t\f\b'
-        
-        # If more than 30% non-text characters, assume binary
-        non_text = bytes_data.translate(None, text_characters)
-        return len(non_text) / len(sample) > 0.30
 
     # -------------------------------------------------------------------------
     # - Prompts: Application Starter

@@ -11,7 +11,6 @@ this file imports before the helper exists.
 Feature: git-for-windows-bug-in-file-seeding
 """
 
-import base64
 import os
 import sys
 from pathlib import Path
@@ -162,9 +161,11 @@ class TestSeedCollectFilesPreservation:
         assert [entry['filePath'] for entry in collected] == ['README.md']
 
     # Feature: git-for-windows-bug-in-file-seeding, Preservation of content.
-    # Validates: Requirements 3.4
-    def test_utf8_file_content_is_text_and_mode_is_normal(self, tmp_path):
-        """A UTF-8 file is returned as decoded text with fileMode NORMAL."""
+    # Validates: Requirements 3.4 (fileMode only; the fileContent assertion
+    # here supersedes requirement 3.4 of that spec, per requirement 4.2 of the
+    # binary-and-non-utf-8-files-are-seeded-as-base64 spec).
+    def test_utf8_file_content_is_bytes_and_mode_is_normal(self, tmp_path):
+        """A UTF-8 file is returned as raw bytes with fileMode NORMAL."""
         text = 'caf\u00e9 \u2713 plain text\n'
         nested = tmp_path / 'docs'
         nested.mkdir()
@@ -175,15 +176,18 @@ class TestSeedCollectFilesPreservation:
 
         assert len(collected) == 1
         assert collected[0]['filePath'] == 'docs/notes.txt'
-        assert collected[0]['fileContent'] == text
+        assert isinstance(collected[0]['fileContent'], bytes)
+        assert collected[0]['fileContent'] == text.encode('utf-8')
         assert collected[0]['fileMode'] == 'NORMAL'
 
     # Feature: git-for-windows-bug-in-file-seeding, Preservation of content.
-    # Validates: Requirements 3.4
-    def test_non_utf8_file_content_is_base64_text_and_mode_is_normal(
+    # Validates: Requirements 3.4 (fileMode only; the fileContent assertion
+    # here supersedes requirement 3.4 of that spec, per requirement 4.2 of the
+    # binary-and-non-utf-8-files-are-seeded-as-base64 spec).
+    def test_non_utf8_file_content_is_raw_bytes_and_mode_is_normal(
         self, tmp_path
     ):
-        """A non-UTF-8 file is returned as base64 text with fileMode NORMAL."""
+        """A non-UTF-8 file is returned as raw bytes with fileMode NORMAL."""
         raw = b'\xff\xfe\x00\x80binary\x81\x00'
         with pytest.raises(UnicodeDecodeError):
             raw.decode('utf-8')
@@ -196,8 +200,8 @@ class TestSeedCollectFilesPreservation:
 
         assert len(collected) == 1
         assert collected[0]['filePath'] == 'assets/blob.bin'
-        assert collected[0]['fileContent'] == base64.b64encode(raw).decode('utf-8')
-        assert base64.b64decode(collected[0]['fileContent']) == raw
+        assert isinstance(collected[0]['fileContent'], bytes)
+        assert collected[0]['fileContent'] == raw
         assert collected[0]['fileMode'] == 'NORMAL'
 
 

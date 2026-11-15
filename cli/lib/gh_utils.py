@@ -462,7 +462,7 @@ class GitHubUtils:
 
             # Create README.md
             readme_path = os.path.join(temp_dir, "README.md")
-            with open(readme_path, 'w') as f:
+            with open(readme_path, 'w', encoding='utf-8', newline='') as f:
                 f.write(readme_content)
 
             subprocess.run(["git", "add", "README.md"], cwd=temp_dir, check=True, capture_output=True)
@@ -487,25 +487,43 @@ class GitHubUtils:
 
     @staticmethod
     def create_init_commit(all_files: List[Dict], repo_name: str, seed_branch: str, author: str, email: str, git_dir: str) -> None:
-        """
-        Create an initial commit with all files in a GitHub repository using the gh CLI.
+        """Create an initial commit with all files in a GitHub repository using the gh CLI.
+
+        The repository is cloned with ``core.autocrlf=false`` and every file is
+        written as bytes, so the committed files match the supplied content
+        regardless of the user's git line-ending settings or locale encoding.
 
         Args:
-            all_files (list): List of dictionaries containing file information
-            repo_name (str): Repository name (e.g., "owner/repo")
-            seed_branch (str): Branch name for seeding
-            author (str): Author name for commits
-            email (str): Author email for commits
-            git_dir (str): Path to the cloned repository directory
+            all_files: List of dictionaries containing file information. Each
+                dictionary has a ``filePath`` (str, relative path) and a
+                ``fileContent`` that may be ``bytes`` (written as-is) or ``str``
+                (encoded as UTF-8 before writing).
+            repo_name: Repository name (e.g., "owner/repo").
+            seed_branch: Branch name for seeding.
+            author: Author name for commits.
+            email: Author email for commits.
+            git_dir: Path to the directory the repository is cloned into.
+
+        Raises:
+            Exception: If any gh or git command fails. The message includes the
+                failed command and its stderr.
+
+        Example:
+            >>> GitHubUtils.create_init_commit(
+            ...     [{'filePath': 'logo.png', 'fileContent': b'\\x89PNG\\r\\n'}],
+            ...     'owner/repo', 'dev', 'Jane Doe', 'jane@example.com',
+            ...     '/tmp/clone')  # doctest: +SKIP
         """
 
         try:
 
             total_files = len(all_files)
 
-            # Clone the repository
+            # core.autocrlf=false is applied at clone time so the clone's own
+            # tracked files are checked out without line-ending conversion and
+            # "git add ." does not restage them
             subprocess.run(
-                ["gh", "repo", "clone", repo_name, git_dir],
+                ["gh", "repo", "clone", repo_name, git_dir, "--", "-c", "core.autocrlf=false"],
                 check=True, capture_output=True
             )
             
@@ -534,8 +552,10 @@ class GitHubUtils:
                 full_path = os.path.join(git_dir, file_path)
                 os.makedirs(os.path.dirname(full_path), exist_ok=True)
                 
-                # Write file content
-                with open(full_path, 'w' if isinstance(file_content, str) else 'wb') as f:
+                # Write file content as bytes (no encoding or newline translation)
+                if isinstance(file_content, str):
+                    file_content = file_content.encode('utf-8')
+                with open(full_path, 'wb') as f:
                     f.write(file_content)
             
             # Add all files
