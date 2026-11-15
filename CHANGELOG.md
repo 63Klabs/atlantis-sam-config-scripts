@@ -9,7 +9,7 @@ To update your local cli scripts from GitHub repository:
 - The scripts are still in BETA and features are still being added and tested.
 - Report any issues or requests via the [Issues page in the GitHub repository](https://github.com/63Klabs/atlantis-sam-config-scripts/issues)
 
-## v0.0.21 (unreleased)
+## v0.0.21 (2026-11-15)
 
 ### Fixed
 - **Script: create_repo.py v0.2.1** - Fixed seeding of CodeCommit repositories from Windows (Git Bash), where files in subdirectories were committed at the repository root with backslashes in their names and `git checkout` failed with `invalid path` [Spec: 0-0-21-git-for-windows-bug-in-file-seeding](.kiro/specs/0-0-21-git-for-windows-bug-in-file-seeding/), addresses [#9](https://github.com/63Klabs/atlantis-sam-config-scripts/issues/9)

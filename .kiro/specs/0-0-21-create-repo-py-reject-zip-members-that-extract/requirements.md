@@ -130,9 +130,9 @@ The fix adds one private containment check that runs on the final `output_path` 
 
 ## Out of Scope
 
-- Reordering `create_and_seed_repository` to download and validate the zip before creating the repository (PLAN.md Decision 5, to be filed as a separate issue)
-- The prefix-match containment check in `cli/update.py` (PLAN.md Decision 3, to be filed as a separate issue)
-- Limits on member count, per-member size, and total extracted size (PLAN.md Decision 4, to be filed as a separate issue)
+- Reordering `create_and_seed_repository` to download and validate the zip before creating the repository (PLAN.md Decision 5, filed as [#17](https://github.com/63Klabs/atlantis-sam-config-scripts/issues/17))
+- The prefix-match containment check in `cli/update.py` (PLAN.md Decision 3, filed as [#15](https://github.com/63Klabs/atlantis-sam-config-scripts/issues/15))
+- Limits on member count, per-member size, and total extracted size (PLAN.md Decision 4, filed as [#16](https://github.com/63Klabs/atlantis-sam-config-scripts/issues/16))
 - Storing `source.zip` outside the extraction directory, and the `source.zip` member name collision (PLAN.md Section 7, note only)
 - Windows alternate data streams, reserved device names, trailing dots and spaces, and case-colliding member names (PLAN.md D5, note only)
 - A skip-and-report mode for unsafe members, and any new command-line flag

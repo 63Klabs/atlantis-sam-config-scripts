@@ -118,6 +118,7 @@ One more observation from that run: a GitHub zip in which every member starts wi
 | D4 | Directory members are checked as well as file members. | `mkdir(parents=True)` on an unchecked path creates directories outside (claim 4). |
 | D5 | Windows-only name tricks (ADS, reserved names) are not handled. | They do not escape the directory. Noted in Section 7. |
 | D6 | No change to the CLI surface. No new flag. | Hardening only. Version stays PATCH or unchanged. |
+| D7 | The three confirmed spin-offs were filed on 2026-11-15 with the `enhancement` label only: [#15](https://github.com/63Klabs/atlantis-sam-config-scripts/issues/15) (`update.py` containment check, Decision 3), [#16](https://github.com/63Klabs/atlantis-sam-config-scripts/issues/16) (member count and size limits, Decision 4), [#17](https://github.com/63Klabs/atlantis-sam-config-scripts/issues/17) (validate the zip before creating the repository, Decision 5). | Keeps this spec to the containment fix. Each issue describes the finding as low risk and gives no exploit detail. |
 
 ## 7. Related improvements
 

@@ -123,7 +123,7 @@ Reject zip members that extract outside the temporary directory in `create_repo.
   - Follow `.kiro/steering/changelog-convention.md` and the format of the neighboring `v0.0.21` entries
   - _Requirements: 5.2_
 
-- [-] 8. Release verification, spin-offs, and issue housekeeping (maintainer task)
+- [x] 8. Release verification, spin-offs, and issue housekeeping (maintainer task)
   - **The agent does not create or delete repositories, upload objects, or file issues without the maintainer's go-ahead.**
   - **Starter zips (requirement 6.1):** the four public starter zips download anonymously and need no AWS credentials. With the maintainer's go-ahead, the agent downloads them into a scratch directory and runs each through `_resolve_member_path` (a throwaway script, not committed), and confirms none is rejected. Otherwise the maintainer runs it.
   - **R2 (Windows Git Bash, `.ve` venv):** upload a zip with a harmless `..\outside-test.txt` member to a test S3 location, then run `./cli/create_repo.py <throwaway-name> --source s3://<bucket>/<key>.zip` from a scratch directory. Confirm exit status 1, the specific "Unsafe source zip" message, the CodeCommit repository deleted, and no `outside-test.txt` outside the extraction directory. Delete the throwaway S3 object afterward.
