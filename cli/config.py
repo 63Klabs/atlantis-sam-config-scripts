@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-VERSION = "v0.1.9/2026-07-24"
+VERSION = "v0.2.0/2026-11-15"
 # Created by Chad Kluck with AI assistance from Amazon Q Developer
 # GitHub Copilot assisted in color formats of output and prompts
 
@@ -47,6 +47,26 @@ TEMPLATES_DIR = "local-templates"
 SAMCONFIG_DIR = "samconfigs"
 SETTINGS_DIR = "defaults"
 VALID_INFRA_TYPES = ['service-role', 'pipeline', 'storage', 'network']
+
+# Recommended (not enforced) name lengths. Source: Atlantis template parameter text
+# (Prefix "2-6 characters", Prefix + ProjectId "should not exceed 28", ProjectId
+# "suggested maximum of 20") and issue #8 (StageId 6, combined 32). 6 + 20 + 6 = 32.
+# The templates enforce the absolute maximums (Prefix 8, ProjectId 26, StageId 8).
+RECOMMENDED_MAX_PREFIX_LENGTH = 6
+RECOMMENDED_MAX_PROJECT_ID_LENGTH = 20
+RECOMMENDED_MAX_STAGE_ID_LENGTH = 6
+RECOMMENDED_MAX_PREFIX_PROJECT_LENGTH = 28
+RECOMMENDED_MAX_COMBINED_LENGTH = 32
+# AWS limits: S3 general purpose bucket names 3-63 characters, IAM role names 64.
+NAME_LENGTH_WARNING_NOTE = (
+    "Combined lengths of Prefix+ProjectId+StageId > 32 may cause deployment errors "
+    "when creating resources with name-length restrictions. (e.g., S3 bucket names "
+    "must not exceed 63 characters and IAM role names must not exceed 64 characters)"
+)
+# Headings printed above the warning lines. The second one is used by the check
+# that runs after the user has answered the prompts.
+NAME_LENGTH_HEADING = "Prefix, ProjectId, and StageId exceed the recommended lengths:"
+NAME_LENGTH_HEADING_FINAL = "The values you entered exceed the recommended lengths:"
 
 class ConfigManager:
     """
@@ -2602,6 +2622,191 @@ class ConfigManager:
     # none
         
 # =============================================================================
+# ----- Name length warnings --------------------------------------------------
+# =============================================================================
+
+def get_name_length_warnings(
+    prefix: Optional[str],
+    project_id: Optional[str],
+    stage_id: Optional[str],
+    parameters: Optional[Dict],
+) -> List[str]:
+    """Build advisory warning lines for Prefix, ProjectId, and StageId lengths.
+
+    Only values whose parameter is declared by the template are considered, and
+    only ``str`` values. A ``stage_id`` of ``''`` or ``'default'`` counts as
+    absent. This function does no I/O, never exits, and never includes a value
+    in a line; lines contain only names and lengths. It does not check
+    characters or minimum lengths.
+
+    Args:
+        prefix: The Prefix value, or None if not known.
+        project_id: The ProjectId value, or None if not known.
+        stage_id: The StageId value, or None, ``''``, or ``'default'`` if
+            there is no stage.
+        parameters: Template parameters keyed by parameter name. None is
+            treated as an empty dict.
+
+    Returns:
+        Warning lines in the order Prefix, ProjectId, StageId, Prefix+ProjectId,
+        Prefix+ProjectId+StageId, followed by NAME_LENGTH_WARNING_NOTE. An empty
+        list if nothing is over its recommended maximum.
+
+    Example:
+        >>> declared = {'Prefix': {}, 'ProjectId': {}, 'StageId': {}}
+        >>> get_name_length_warnings('acme', 'myapp', 'test', declared)
+        []
+        >>> get_name_length_warnings('acmecorp', 'myapp', 'dev', declared)[0]
+        'Prefix is 8 characters (recommended maximum: 6).'
+    """
+    declared = parameters or {}
+    lengths: Dict[str, int] = {}
+
+    if 'Prefix' in declared and isinstance(prefix, str):
+        lengths['Prefix'] = len(prefix)
+    if 'ProjectId' in declared and isinstance(project_id, str):
+        lengths['ProjectId'] = len(project_id)
+    if ('StageId' in declared and isinstance(stage_id, str)
+            and stage_id not in ('', 'default')):
+        lengths['StageId'] = len(stage_id)
+
+    limits = (
+        ('Prefix', RECOMMENDED_MAX_PREFIX_LENGTH),
+        ('ProjectId', RECOMMENDED_MAX_PROJECT_ID_LENGTH),
+        ('StageId', RECOMMENDED_MAX_STAGE_ID_LENGTH),
+    )
+
+    warnings: List[str] = []
+    for name, limit in limits:
+        if name in lengths and lengths[name] > limit:
+            warnings.append(
+                f"{name} is {lengths[name]} characters (recommended maximum: {limit})."
+            )
+
+    if 'Prefix' in lengths and 'ProjectId' in lengths:
+        prefix_project_length = lengths['Prefix'] + lengths['ProjectId']
+        if prefix_project_length > RECOMMENDED_MAX_PREFIX_PROJECT_LENGTH:
+            warnings.append(
+                f"Prefix+ProjectId is {prefix_project_length} characters "
+                f"(recommended maximum: {RECOMMENDED_MAX_PREFIX_PROJECT_LENGTH})."
+            )
+
+    if 'Prefix' in lengths and 'ProjectId' in lengths and 'StageId' in lengths:
+        combined_length = (
+            lengths['Prefix'] + lengths['ProjectId'] + lengths['StageId']
+        )
+        if combined_length > RECOMMENDED_MAX_COMBINED_LENGTH:
+            warnings.append(
+                f"Prefix+ProjectId+StageId is {combined_length} characters "
+                f"(recommended maximum: {RECOMMENDED_MAX_COMBINED_LENGTH})."
+            )
+
+    if warnings:
+        warnings.append(NAME_LENGTH_WARNING_NOTE)
+    return warnings
+
+
+def show_name_length_warnings(
+    warnings: List[str],
+    headless: bool = False,
+    heading: str = NAME_LENGTH_HEADING,
+) -> None:
+    """Print and log name length warning lines. Advisory only.
+
+    This function never prompts, never exits, and returns nothing. Failures
+    while printing or logging are swallowed so that an advisory message can
+    never stop a run. ``KeyboardInterrupt`` is not caught.
+
+    Args:
+        warnings: Lines from ``get_name_length_warnings``. An empty list
+            produces no output and no log entries.
+        headless: If True, write one plain ``Warning: <line>`` per line to
+            standard error, with no color, heading, or blank lines. If False,
+            write a blank line, the colored heading, the colored indented
+            lines, and a blank line to standard output.
+        heading: Heading printed above the lines when ``headless`` is False.
+
+    Example:
+        >>> show_name_length_warnings([], headless=True)  # prints nothing
+        >>> show_name_length_warnings(
+        ...     ['Prefix is 8 characters (recommended maximum: 6).'], headless=True)
+    """
+    if not warnings:
+        return
+
+    try:
+        if headless:
+            for line in warnings:
+                click.echo(f"Warning: {line}", err=True)
+        else:
+            click.echo()
+            click.echo(Colorize.warning(heading))
+            for line in warnings:
+                click.echo(Colorize.warning(f"  {line}"))
+            click.echo()
+    except Exception:
+        # The warning is advisory. A broken stream or terminal must not stop
+        # the run, and there is nowhere safe to report the failure.
+        pass
+
+    for line in warnings:
+        try:
+            Log.warning(line)
+        except Exception:
+            # The logger is the most likely cause of a failure here, so
+            # logging the failure would only repeat it. Keep going.
+            pass
+
+
+def warn_if_final_names_exceed(
+    initial_names: Tuple[Optional[str], Optional[str], Optional[str]],
+    parameter_values: Dict,
+    parameters: Optional[Dict],
+) -> bool:
+    """Warn about name lengths if the user changed Prefix, ProjectId, or StageId.
+
+    Called after the parameter prompts. The user may have replaced the values
+    that were checked before the prompts. If the final values equal the
+    initial values, the earlier check already covered them and nothing is
+    printed. Otherwise the final values are checked and any warnings are shown
+    with the "values you entered" heading. Advisory only: never prompts and
+    never exits.
+
+    Args:
+        initial_names: ``(prefix, project_id, stage_id)`` as checked before
+            the prompts.
+        parameter_values: Parameter values returned by the prompts. A key that
+            is missing keeps its initial value.
+        parameters: Template parameter definitions, used to decide which of
+            the three names the template declares.
+
+    Returns:
+        True if the final values differ from ``initial_names`` (the check was
+        run), False if they are unchanged (nothing was printed).
+
+    Example:
+        >>> initial = ('acmecorp', 'myapp', 'dev')
+        >>> warn_if_final_names_exceed(initial, {}, {'Prefix': {}})
+        False
+        >>> warn_if_final_names_exceed(initial, {'Prefix': 'acme'}, {'Prefix': {}})
+        True
+    """
+    final_names = (
+        parameter_values.get('Prefix', initial_names[0]),
+        parameter_values.get('ProjectId', initial_names[1]),
+        parameter_values.get('StageId', initial_names[2]),
+    )
+    if final_names == tuple(initial_names):
+        return False
+
+    show_name_length_warnings(
+        get_name_length_warnings(*final_names, parameters),
+        heading=NAME_LENGTH_HEADING_FINAL,
+    )
+    return True
+
+
+# =============================================================================
 # ----- Main function ---------------------------------------------------------
 # =============================================================================
 
@@ -2659,6 +2864,7 @@ Notes:
     --deploy only takes effect when paired with --headless.
     --skeleton-verbose includes parameter descriptions and constraints in the skeleton.
     If both --skeleton and --skeleton-verbose are provided, --skeleton-verbose wins.
+    A warning is shown when Prefix, ProjectId, or StageId exceed the recommended lengths (Prefix 6, ProjectId 20, StageId 6; Prefix+ProjectId 28; all three 32). It does not stop the run.
 
 """
 
@@ -2807,6 +3013,13 @@ def run_skeleton_mode(args):
     # 4. Get template parameters via get_template_parameters()
     parameter_groups, parameters = config_manager.get_template_parameters(template_file)
 
+    show_name_length_warnings(get_name_length_warnings(
+        config_manager.prefix,
+        config_manager.project_id,
+        config_manager.stage_id,
+        parameters,
+    ))
+
     # 5. Call generate_skeleton() to build skeleton dict
     verbose = args.skeleton_verbose
     skeleton = config_manager.generate_skeleton(
@@ -2921,6 +3134,18 @@ def run_headless_mode(args):
         .get('deploy', {})
         .get('parameters', {})
         .get('parameter_overrides', {})
+    )
+
+    # Advisory name length warning (stderr in headless mode). Runs after the
+    # validation exit so it never masks validation errors, and never blocks.
+    show_name_length_warnings(
+        get_name_length_warnings(
+            parameter_values.get('Prefix'),
+            parameter_values.get('ProjectId'),
+            parameter_values.get('StageId'),
+            parameters
+        ),
+        headless=True
     )
 
     # Extract tags from skeleton (dict format) and convert to List[Dict] format
@@ -3156,6 +3381,11 @@ def main():
         parameter_groups, parameters = config_manager.get_template_parameters(template_file)
         defaults = config_manager.defaults
 
+        # Advisory warning when Prefix, ProjectId, or StageId exceed recommended lengths.
+        # Uses config_manager.stage_id because prompt_for_stage_id may have set it.
+        initial_names = (config_manager.prefix, config_manager.project_id, config_manager.stage_id)
+        show_name_length_warnings(get_name_length_warnings(*initial_names, parameters))
+
         print()
 
         click.echo(Colorize.divider("-", fg=Colorize.INFO))
@@ -3182,6 +3412,9 @@ def main():
 
         # Prompt for parameters
         parameter_values = config_manager.prompt_for_parameters(parameter_groups, parameters, parameter_defaults)
+
+        # Warn again only if the user changed Prefix, ProjectId, or StageId and they still exceed limits
+        warn_if_final_names_exceed(initial_names, parameter_values, parameters)
 
         # If Repository in parameter_values, use AWS CLI to access repository and get resource tags
         # if parameter_values['Repository'] does not have a slash, assume it is CodeCommit and not GitHub

@@ -34,6 +34,18 @@ For usage info:
 ./cli/config.py -h
 ```
 
+The script warns when the Prefix, ProjectId, or StageId you use are longer than recommended. Long names can cause a deployment to fail later, when a resource name exceeds an AWS limit (for example, S3 bucket names must not exceed 63 characters and IAM role names must not exceed 64 characters). The recommended lengths are:
+
+| Value | Recommended maximum |
+|-------|---------------------|
+| Prefix | 6 characters |
+| ProjectId | 20 characters |
+| StageId | 6 characters |
+| Prefix + ProjectId | 28 characters |
+| Prefix + ProjectId + StageId | 32 characters |
+
+The warning is advisory. It does not prompt, stop the script, or change the exit code. The template still enforces its own maximums (Prefix 8, ProjectId 26, StageId 8), and a value over a template maximum is rejected as before. The warning appears in interactive mode, with `--skeleton` and `--skeleton-verbose`, and with `--headless`. In headless mode each warning is written to standard error as a line that begins with `Warning:`, so standard output is unchanged. Only the parameters that the selected template declares are checked. For example, a service role template that declares only Prefix is checked for Prefix alone.
+
 ## deploy.py
 
 After configuring a stack, you must deploy it. Although the scripts maintain a samconfig file, it utilizes a template repository hosted in S3, which, oddly, samconfig does not support even though CloudFormation templates can easily import Lambda code and nested stacks from S3.

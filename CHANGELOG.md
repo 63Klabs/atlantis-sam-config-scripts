@@ -9,6 +9,16 @@ To update your local cli scripts from GitHub repository:
 - The scripts are still in BETA and features are still being added and tested.
 - Report any issues or requests via the [Issues page in the GitHub repository](https://github.com/63Klabs/atlantis-sam-config-scripts/issues)
 
+## v0.0.22 (unreleased)
+
+### Added
+- **Script: config.py v0.2.0** - Added a warning when Prefix, ProjectId, or StageId exceed the recommended lengths [Spec: 0-0-22-the-config-py-script-should-ensure-prefix](.kiro/specs/0-0-22-the-config-py-script-should-ensure-prefix/), addresses [#8](https://github.com/63Klabs/atlantis-sam-config-scripts/issues/8)
+  - Recommended lengths are Prefix 6, ProjectId 20, StageId 6, Prefix+ProjectId combined 28, and Prefix+ProjectId+StageId combined 32. The warning names which values or combinations exceed them.
+  - The warning is advisory. It never prompts, blocks, or changes exit codes.
+  - It applies in interactive, `--skeleton`, and `--headless` modes. In headless mode the warning is written to standard error as `Warning:` lines, so standard output is unchanged.
+  - Only parameters the selected template declares are checked. For example, service-role templates are checked for Prefix only, and storage templates are not checked for StageId.
+  - Template validation still enforces the maximums (Prefix 8, ProjectId 26, StageId 8).
+
 ## v0.0.21 (2026-11-15)
 
 ### Fixed

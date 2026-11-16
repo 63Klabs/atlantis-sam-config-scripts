@@ -1,0 +1,363 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. Confirm the starting state": [
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782712191
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782720663
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782749834
+      }
+    ],
+    "2.1 Add the constants (`cli/config.py`)": [
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782712386
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782752007
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782805185
+      }
+    ],
+    "2.2 Add `get_name_length_warnings` (`cli/config.py`)": [
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782712616
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782807594
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782851359
+      }
+    ],
+    "2.3 Unit tests for the function (`tests/test_name_length_warnings.py`, new file)": [
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782712836
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782855197
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782934976
+      }
+    ],
+    "2.4 Property test for the function (same file)": [
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782713132
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782937308
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782990048
+      }
+    ],
+    "3.1 Add `show_name_length_warnings` (`cli/config.py`)": [
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782713362
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782992587
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783029257
+      }
+    ],
+    "3.2 Add `warn_if_final_names_exceed` (`cli/config.py`)": [
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782713599
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783033976
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783069387
+      }
+    ],
+    "3.3 Printer and wrapper tests (`tests/test_name_length_warnings.py`)": [
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782713818
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783071885
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783136407
+      }
+    ],
+    "4.1 Interactive `main()` (`cli/config.py`)": [
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782714125
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783138886
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783173711
+      }
+    ],
+    "4.2 `run_skeleton_mode` (`cli/config.py`)": [
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782714355
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783176196
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783236298
+      }
+    ],
+    "4.3 `run_headless_mode` (`cli/config.py`)": [
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782714723
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783238499
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783271941
+      }
+    ],
+    "4.4 Flow tests (`tests/test_name_length_flow.py`, new file)": [
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782715002
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783274297
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783376834
+      }
+    ],
+    "5. Checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782715207
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783380985
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783427687
+      }
+    ],
+    "6.1 Version marker (`cli/config.py`)": [
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782715488
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783432016
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783480236
+      }
+    ],
+    "6.2 `EPILOG` note (`cli/config.py`)": [
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782715742
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783482874
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783522972
+      }
+    ],
+    "6.3 Update `docs/SCRIPT-GUIDE.md`": [
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782715991
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783525583
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783549212
+      }
+    ],
+    "6.4 Confirm no other documentation changes": [
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782716225
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783551814
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783569467
+      }
+    ],
+    "7. Update CHANGELOG.md": [
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782716532
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783572223
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783604572
+      }
+    ],
+    "8. Final checkpoint": [
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782716775
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783607383
+      },
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783645937
+      }
+    ],
+    "9. Release verification and housekeeping (maintainer task)": [
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782717091
+      }
+    ],
+    "2. Constants and the pure warning function": [
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794782990375
+      }
+    ],
+    "3. Printer and final-values wrapper": [
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783136642
+      }
+    ],
+    "4. Call sites": [
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783377094
+      }
+    ],
+    "6. Version, help text, and user documentation": [
+      {
+        "executionId": "173c6c47-0bcb-457a-a2ba-14049be8848a",
+        "chatSessionId": "sess_15a905e6-5818-40b0-be16-312e7814d323",
+        "timestamp": 1794783569839
+      }
+    ]
+  }
+}

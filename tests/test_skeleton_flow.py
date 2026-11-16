@@ -47,6 +47,10 @@ def _make_skeleton_args(**kwargs):
 def _mock_config_manager():
     """Create a mock ConfigManager instance with necessary methods."""
     mock_cm = MagicMock(spec=ConfigManager)
+    # Instance attributes set in ConfigManager.__init__ are not visible to spec=
+    mock_cm.prefix = 'acme'
+    mock_cm.project_id = 'myapp'
+    mock_cm.stage_id = 'dev'
     mock_cm.discover_templates.return_value = ['s3://bucket/template.yml?versionId=abc123']
     mock_cm.get_latest_version_id.return_value = 's3://bucket/template.yml?versionId=abc123'
     mock_cm.get_template_parameters.return_value = (
