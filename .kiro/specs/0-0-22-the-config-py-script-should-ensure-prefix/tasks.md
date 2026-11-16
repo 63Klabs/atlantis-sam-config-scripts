@@ -146,7 +146,7 @@ Warn in `config.py` when Prefix, ProjectId, or StageId exceed the recommended le
   - Ensure all tests pass, ask the user if questions arise
   - _Requirements: 6.11, 7.1 to 7.6_
 
-- [~] 9. Release verification and housekeeping (maintainer task)
+- [x] 9. Release verification and housekeeping (maintainer task)
   - **The agent does not deploy, create stacks, push commits, or close issues without the maintainer's go-ahead.**
   - **Interactive, pipeline template (requirement 8.1):** run `./cli/config.py pipeline <prefix> <project> <stage> --profile <profile>` from a scratch copy with a Prefix of 8, ProjectId of 22, and StageId of 8 characters, and a pipeline template. Confirm the warning lists each value, the Prefix+ProjectId and total lines, and the note; that it appears after the template version output and before the prompts; and that the run continues. Retype a shorter Prefix at the prompt and confirm the second warning appears with the "values you entered" heading only when the final values still exceed a limit. Press `^` at the first prompt to exit without saving.
   - **Service-role and storage templates (requirement 8.2):** run the script against a service-role template and a storage template with the same long values. Confirm no warning mentions ProjectId or StageId for service-role, and none mentions StageId for storage.

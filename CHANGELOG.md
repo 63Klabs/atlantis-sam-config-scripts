@@ -9,7 +9,7 @@ To update your local cli scripts from GitHub repository:
 - The scripts are still in BETA and features are still being added and tested.
 - Report any issues or requests via the [Issues page in the GitHub repository](https://github.com/63Klabs/atlantis-sam-config-scripts/issues)
 
-## v0.0.22 (unreleased)
+## v0.0.22 (2026-11-15)
 
 ### Added
 - **Script: config.py v0.2.0** - Added a warning when Prefix, ProjectId, or StageId exceed the recommended lengths [Spec: 0-0-22-the-config-py-script-should-ensure-prefix](.kiro/specs/0-0-22-the-config-py-script-should-ensure-prefix/), addresses [#8](https://github.com/63Klabs/atlantis-sam-config-scripts/issues/8)
